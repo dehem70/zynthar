@@ -1,0 +1,44 @@
+Étape 1 : Installation de mxpy et de Rust Vous aurez besoin de pip et pipx pour installer l'outil en ligne de commande mxpy
+. Rust est nécessaire pour compiler les contrats
+.
+# 1. Installer pip (si ce n'est pas déjà fait)
+sudo apt install python3-pip
+
+# 2. Installer pipx
+sudo apt install pipx
+
+# 3. Installer mxpy
+pipx install mxpy
+
+# 4. Vérifier l'installation de mxpy
+mxpy --version
+
+# 5. Installer Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+(Optionnel) Si vous souhaitez activer l'autocomplétion des commandes mxpy dans votre terminal Linux, vous pouvez lancer mxpy --install-shell-autocomplete
+.
+Étape 2 : Génération de la trame de Smart Contract
+# Générer un contrat vide nommé "mon-contrat"
+sc-meta new --template empty --name mon-contrat
+.
+Étape 3 : Compilation
+# Se placer dans le dossier de votre projet
+cd mon-contrat
+
+# Compiler le contrat (génère les fichiers .wasm et l'ABI)
+sc-meta all build
+
+Étape 4 : modifier le fichier .rs dans le répertoire /src
+
+Étape 5 : Déploiement et mises à jour
+Il y a deux approches : l'approche classique via mxpy ou l'approche moderne via les interactors générés en Rust
+.
+Option A : Déploiement classique via mxpy
+mxpy contract deploy --bytecode output/mon-contrat.wasm --recall-nonce --pem=votre_wallet.pem --gas-limit=60000000 --send --proxy=https://devnet-gateway.multiversx.com --chain=D
+Option B : Déploiement et mises à jour via les interactors (Recommandé) Cette méthode permet de scripter les futurs déploiements et mises à jour directement en Rust
+.
+# 1. Générer le dossier "interactor" depuis la racine de votre contrat
+sc-meta all interactors
+
+# 2. Se rendre dans le dossier de l'interactor (si nécessaire pour certaines actions) ou lancer directement via cargo :
+cargo run deploy
