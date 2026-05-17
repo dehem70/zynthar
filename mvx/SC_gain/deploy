@@ -1,0 +1,16 @@
+*mxpy contract deploy --bytecode output/gain.wasm \
+  --pem="wallet-owner.pem" \
+  --metadata-payable \
+  --gas-limit=60000000 \
+  --arguments "erd1ag8na9z4npwvclfhwcuu4cv0zyfc4yeuf9ycmrazz0tktmmd20psjq4fjv" "erd1qqqqqqqqqqqqqpgq3ua3cnwccanatk2f80rg6fcvg7ycx6y420psa09a9x" \
+  --proxy="https://devnet-gateway.multiversx.com" --chain="D" --send
+
+
+
+mxpy contract upgrade erd1qqqqqqqqqqqqqpgq6vuksjwjv78yefy64rlllr6mcsz9ltsm20ps880r5p --bytecode output/gain.wasm \
+  --pem="wallet-owner.pem" \
+  --gas-limit=60000000 \
+  --metadata-payable \
+   --arguments "erd1ag8na9z4npwvclfhwcuu4cv0zyfc4yeuf9ycmrazz0tktmmd20psjq4fjv" "erd1qqqqqqqqqqqqqpgq3ua3cnwccanatk2f80rg6fcvg7ycx6y420psa09a9x" \
+  --proxy="https://devnet-gateway.multiversx.com" --chain="D" --send
+

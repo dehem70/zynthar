@@ -1,0 +1,16 @@
+mxpy contract deploy --bytecode output/inscription.wasm \
+    --pem wallet-owner.pem \
+    --gas-limit 10000000 \
+    --proxy https://devnet-gateway.multiversx.com \
+    --chain D \
+    --arguments erd1qqqqqqqqqqqqqpgqruq9k0jpne6eq98l0ah34ks3a3lqxk8z20psj3s9sz  erd1v4j95583gn9zy028x87ssk76duhytjf9lyw5luv8j64n25eardeszwh0f6 \
+    --send
+
+
+mxpy contract upgrade erd1qqqqqqqqqqqqqpgq3ua3cnwccanatk2f80rg6fcvg7ycx6y420psa09a9x --bytecode output/inscription.wasm \
+    --pem wallet-owner.pem \
+    --gas-limit 10000000 \
+    --proxy https://devnet-gateway.multiversx.com \
+    --chain D \
+    --arguments erd1qqqqqqqqqqqqqpgq6vuksjwjv78yefy64rlllr6mcsz9ltsm20ps880r5p  erd1v4j95583gn9zy028x87ssk76duhytjf9lyw5luv8j64n25eardeszwh0f6 \
+    --send
