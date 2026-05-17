@@ -1,1 +1,2 @@
-dans ce répertoire un premier script de génération de cartes
+dans ce répertoire un premier script de génération de cartes procédurales
+
