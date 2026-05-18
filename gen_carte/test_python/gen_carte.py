@@ -7,10 +7,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import copy
+import gestion_db
 
 largeur=1000
 longueur=1000
 nb_iles=4
+nom="test"
+
 
 import random
 from matplotlib.colors import LightSource
@@ -813,6 +816,19 @@ def generer_archipel(width, height, num_graines, octaves=6, persistence=0.5):
     
     return archipel
 
+def enregistrer_monde(nom,monde):
+   for x in range(longueur):
+      for y in range(largeur):
+         print("traitement de la tuile ",x,y)
+         case=monde[x][y]
+         type=case["type"]
+         biome=case["biome"]
+         sol=case["sol"]
+         objet=case["objet"]
+         gestion_db.ajoute_tuile(nom,x,y,type,biome,sol,objet)
+
+
+
 carte_hauteur=generer_archipel_avec_fonds(longueur,largeur,nb_iles)
 carte_hauteur,carte_riviere=appliquer_erosion_agents(carte_hauteur)
 carte_ressources=generer_carte_ressources(longueur, largeur)
@@ -822,4 +838,6 @@ carte_temperature=generer_carte_temperature(longueur, largeur, carte_hauteur)
 carte_vegetation=generer_carte_vegetation(longueur, largeur, carte_humide, carte_temperature)
 monde=generer_monde_final_avec_rivieres(longueur, largeur, carte_hauteur, carte_temperature, carte_humide, carte_vegetation, carte_sol, carte_ressources, carte_riviere)
 afficher_monde_couleur(monde)
-
+gestion_db.create_db_monde(nom)
+gestion_db.ajoute_info(nom,longueur,largeur)
+enregistrer_monde(nom,monde)
