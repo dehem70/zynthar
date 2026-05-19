@@ -96,10 +96,11 @@ def ajoute_tuile(nom,x,y,typ,biome,sol,objet):
       ajoute_caracteristique(nom,"objet",objet)
       id_objet=lire_id_caracteristique(nom,"objet",objet)
    try:
-      req='INSERT INTO tuiles VALUES ('+num_tuile+','+str(x)+','+str(y)+','+str(id_type)+','+str(id_biome)+')'
+      req='INSERT INTO tuiles VALUES ('+str(num_tuile)+','+str(x)+','+str(y)+','+str(id_type)+','+str(id_biome)+','+str(id_sol)+','+str(id_objet)+')'
+      print(req)
       c.execute(req)
       cnx.commit()
    except:
-      print("pb dans insert tuile ",nom," avec valeur ",x,y)
+      print("pb dans insert tuile ",nom," avec valeurs ",x,y)
    cnx.close()
    return num_tuile
