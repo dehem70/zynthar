@@ -9,8 +9,8 @@ import numpy as np
 import copy
 import gestion_db
 
-largeur=1000
-longueur=1000
+largeur=100
+longueur=200
 nb_iles=4
 nom="test"
 
@@ -104,7 +104,7 @@ def afficher_monde_couleur(monde_final):
     pour chaque type de biome, ainsi que pour les rivières et les objets rares.
     """
     height = len(monde_final)
-    width = len(monde_final)
+    width = len(monde_final[0])
     
     # Création d'une image vide avec 3 canaux (Rouge, Vert, Bleu)
     image_rgb = np.zeros((height, width, 3))
@@ -219,7 +219,7 @@ def appliquer_erosion_agents(carte_hauteur, nb_gouttes=500000, max_vie=100):
     Retourne la carte de hauteur modifiée ET la carte d'accumulation d'eau.
     """
     height = len(carte_hauteur)
-    width = len(carte_hauteur)
+    width = len(carte_hauteur[0])
     
     # NOUVEAU : Initialisation de la carte d'accumulation d'eau
     carte_riviere = [[0.0 for _ in range(width)] for _ in range(height)]
@@ -820,7 +820,7 @@ def enregistrer_monde(nom,monde):
    for x in range(longueur):
       for y in range(largeur):
          print("traitement de la tuile ",x,y)
-         case=monde[x][y]
+         case=monde[y][x]
          type=case["type"]
          biome=case["biome"]
          sol=case["sol"]

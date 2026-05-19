@@ -68,36 +68,49 @@ def ajoute_info(nom,xmax,ymax):
 def ajoute_tuile(nom,x,y,typ,biome,sol,objet):
    cnx=sqlite3.connect(nom+".db")
    c=cnx.cursor()
+   list_type=[]
+   list_biome=[]
+   list_sol=[]
+   list_objet=[]
    try:
       req='SELECT xmax,ymax FROM info WHERE nom="'+nom+'"'
-      print(req)
       c.execute(req)
       info=c.fetchall()
-      print(info)
       xmax=info[0][0]
       ymax=info[0][1]
    except:
       print("pb dans SELECT info ",nom, info)
    num_tuile=xmax*y+x
-   id_type=lire_id_caracteristique(nom,"type",typ)
-   if id_type==-1:
+   try:
+      id_type=list_type.index(typ)
+   except:
       ajoute_caracteristique(nom,"type",typ)
-      id_type=lire_id_caracteristique(nom,"type",typ)
-   id_biome=lire_id_caracteristique(nom,"biome",biome)
-   if id_biome==-1:
-      ajoute_caracteristique(nom,"biome",biome)
-      id_biome=lire_id_caracteristique(nom,"biome",biome)
-   id_sol=lire_id_caracteristique(nom,"sol",sol)
-   if id_sol==-1:
-      ajoute_caracteristique(nom,"sol",sol)
-      id_sol=lire_id_caracteristique(nom,"sol",sol)
-   id_objet=lire_id_caracteristique(nom,"objet",objet)
-   if id_objet==-1:
+      list_type.append(typ)
+      id_type=list_type.index(typ)
+      
+   try:
+      id_objet=list_objet.index(objet)
+   except:
       ajoute_caracteristique(nom,"objet",objet)
-      id_objet=lire_id_caracteristique(nom,"objet",objet)
+      list_objet.append(objet)
+      id_objet=list_objet.index(objet)
+
+   try:
+      id_biome=list_biome.index(biome)
+   except:
+      ajoute_caracteristique(nom,"biome",biome)
+      list_biome.append(biome)
+      id_biome=list_biome.index(biome)
+
+   try:
+      id_sol=list_sol.index(sol)
+   except:
+      ajoute_caracteristique(nom,"sol",sol)
+      list_sol.append(sol)
+      id_sol=list_sol.index(sol)
+
    try:
       req='INSERT INTO tuiles VALUES ('+str(num_tuile)+','+str(x)+','+str(y)+','+str(id_type)+','+str(id_biome)+','+str(id_sol)+','+str(id_objet)+')'
-      print(req)
       c.execute(req)
       cnx.commit()
    except:
