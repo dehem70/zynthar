@@ -9,8 +9,8 @@ import numpy as np
 import copy
 import gestion_db
 
-largeur=100
-longueur=200
+largeur=500
+longueur=1000
 nb_iles=4
 nom="test"
 
@@ -23,6 +23,8 @@ def generer_monde_final_avec_rivieres(width, height, c_hauteur, c_temp, c_humidi
     
     # Seuil pour définir à partir de combien de passages d'eau on crée une rivière
     seuil_riviere = 25 
+    hauteur_maxi=2000*np.random.randint(4)
+    temperature_maxi=50
 
     for y in range(height):
         ligne = []
@@ -35,7 +37,11 @@ def generer_monde_final_avec_rivieres(width, height, c_hauteur, c_temp, c_humidi
             r = c_res[y][x]
             flux_eau = c_riviere[y][x] # NOUVELLE CARTE
             
-            case = {"type": "eau", "biome": "océan", "sol": "sable", "objet": "rien"}
+            case = {"type": "eau", "biome": "océan", "sol": "sable", "objet": "rien", "altitude":0 , "temperature":0, "humidite":0}
+            
+            case['temperature']=t*temperature_maxi
+            case['altitude']=h*hauteur_maxi
+            case['humidite']=100*m
             
             # 1. EST-CE DE L'OCÉAN ?
             if h <= 0:
@@ -56,6 +62,8 @@ def generer_monde_final_avec_rivieres(width, height, c_hauteur, c_temp, c_humidi
                     case["biome"] = "jungle" if m > 0.6 else "désert"
                 elif t < 0.2:
                     case["biome"] = "toundra" if m < 0.4 else "taïga"
+                elif t < 0 :
+                    case["biome"] = "glacier"
                 else:
                     case["biome"] = "forêt" if m > 0.5 else "plaine"
                 
@@ -122,7 +130,9 @@ def afficher_monde_couleur(monde_final):
         "plage": [0.9, 0.8, 0.4],
         "toundra": [0.7, 0.8, 0.8],            # Gris bleuté clair
         "montagne_rocheuse": [0.5, 0.5, 0.5],  # Gris moyen
-        "pic_enneigé": [0.95, 0.95, 0.95]      # Blanc
+        "pic_enneigé": [0.95, 0.95, 0.95],      # Blanc
+        "glacier": [0.95, 0.95, 0.95]      # Blanc
+        
     }
     
     # Couleurs de surbrillance pour les ressources et trésors
@@ -213,25 +223,55 @@ def calculer_pente_et_direction(x, y, carte_hauteur, width, height):
 
 import random
 
-def appliquer_erosion_agents(carte_hauteur, nb_gouttes=500000, max_vie=100):
+def generer_carte_binaire(carte_hauteur):
+
+    carte_binaire=[]
+    height = len(carte_hauteur)
+    width = len(carte_hauteur[0])
+    for y in range(height):
+        row = []
+        for x in range(width):    
+           if carte_hauteur[y][x]<=0:
+               row.append(-1)
+           else:
+               row.append(1)
+        carte_binaire.append(row)
+    return carte_binaire    
+
+def combiner_hauteur_binaire(carte_hauteur,carte_binaire):
+
+    carte_combine=[]
+    height = len(carte_hauteur)
+    width = len(carte_hauteur[0])
+    for y in range(height):
+        row = []
+        for x in range(width):
+           row.append(abs(carte_hauteur[y][x])*carte_binaire[y][x])
+        carte_combine.append(row)
+    return carte_combine    
+
+
+def appliquer_erosion_agents(carte_hauteur,carte_temperature):
     """
     Simule l'érosion hydraulique et génère simultanément la carte des rivières.
     Retourne la carte de hauteur modifiée ET la carte d'accumulation d'eau.
     """
     height = len(carte_hauteur)
     width = len(carte_hauteur[0])
+    nb_gouttes=height*width*np.random.randint(3)
+    max_vie=50*np.random.randint(5)
     
     # NOUVEAU : Initialisation de la carte d'accumulation d'eau
     carte_riviere = [[0.0 for _ in range(width)] for _ in range(height)]
     
-    capacite_max = 0.05
-    taux_erosion = 0.1
+    capacite_max = 0.1
+    taux_erosion = 0.2
     taux_depot = 0.1
-    facteur_evaporation = 0.95
     
     for _ in range(nb_gouttes):
         x = random.randint(1, width - 2)
         y = random.randint(1, height - 2)
+        facteur_evaporation = 1-abs(carte_temperature[y][x])/5
         
         if carte_hauteur[y][x] <= 0:
             continue
@@ -272,7 +312,7 @@ def appliquer_erosion_agents(carte_hauteur, nb_gouttes=500000, max_vie=100):
 
 def generer_carte_ressources(width, height, seuil_rarete=0.8):
     # Utilisation d'une échelle très fine pour des gisements localisés
-    scale_ressources = 0.1 
+    scale_ressources = 0.03 
     carte_res = []
     seed_res = random.randint(0, 10**6)
     
@@ -344,7 +384,7 @@ def generer_carte_humidite(width, height):
 
     # 2. Paramètres : une échelle intermédiaire permet d'avoir 
     # des zones de pluie réalistes (ni trop petites, ni trop vastes)
-    scale_humidite = 0.008 
+    scale_humidite = 0.08 
     off_x = random.uniform(-100000, 100000)
     off_y = random.uniform(-100000, 100000)
 
@@ -397,6 +437,8 @@ def generer_carte_temperature(width, height, carte_hauteur):
             # Formule : Température diminue avec l'altitude
             # On pondère l'influence de la hauteur (ex: 30%)
             t_finale = t_base - (hauteur * 0.3)
+            
+            t_finale -= abs(height/2-y)/height
             
             row.append(t_finale)
         carte_temp.append(row)
@@ -455,11 +497,11 @@ def generer_archipel_avec_fonds(width, height,num_islands, pourcentage_mer_max=0
 def lisser_carte(grille_binaire, iterations=3):
     """
     Applique un automate cellulaire pour lisser les côtes.
-    :param grille_binaire: Une matrice de 0 (mer) et 1 (terre)
+    :param grille_binaire: Une matrice de -1 (mer) et 1 (terre)
     :param iterations: Nombre de passages (2-3 suffisent généralement)
     """
     height = len(grille_binaire)
-    width = len(grille_binaire)
+    width = len(grille_binaire[0])
     
     for _ in range(iterations):
         # Utilisation d'un buffer pour ne pas modifier la grille en cours de calcul [6]
@@ -478,9 +520,9 @@ def lisser_carte(grille_binaire, iterations=3):
                 # RÈGLES DE TRANSITION [2, 4]
                 # Si la cellule est terre et a moins de 4 voisins terre : elle devient mer
                 if grille_binaire[y][x] == 1 and voisins_terre < 4:
-                    nouvelle_grille[y][x] = 0
+                    nouvelle_grille[y][x] = -1
                 # Si la cellule est mer et a 5 voisins terre ou plus : elle devient terre
-                elif grille_binaire[y][x] == 0 and voisins_terre >= 5:
+                elif grille_binaire[y][x] == -1 and voisins_terre >= 5:
                     nouvelle_grille[y][x] = 1
                     
         grille_binaire = nouvelle_grille
@@ -503,7 +545,7 @@ def generate_voronoi_map(width, height, num_islands):
             
             # Normalisation (plus on est loin de la graine, plus la valeur diminue)
             # On crée ainsi des "dômes" centrés sur chaque graine
-            max_dist = width / 3 # Rayon d'influence arbitraire
+            max_dist = min(height,width) / np.random.randint(3,6) # Rayon d'influence arbitraire
             val = max(0, 1 - (d1 / max_dist))
             voronoi_grid[y, x] = val
             
@@ -825,19 +867,23 @@ def enregistrer_monde(nom,monde):
          biome=case["biome"]
          sol=case["sol"]
          objet=case["objet"]
-         gestion_db.ajoute_tuile(nom,x,y,type,biome,sol,objet)
+         gestion_db.ajoute_tuile(nom,x,y,type,biome,sol,objet,case["altitude"],case["temperature"],case["humidite"])
 
 
 
 carte_hauteur=generer_archipel_avec_fonds(longueur,largeur,nb_iles)
-carte_hauteur,carte_riviere=appliquer_erosion_agents(carte_hauteur)
+carte_binaire=generer_carte_binaire(carte_hauteur)
+carte_binaire=lisser_carte(carte_binaire)
+carte_hauteur=combiner_hauteur_binaire(carte_hauteur,carte_binaire)
+carte_temperature=generer_carte_temperature(longueur, largeur, carte_hauteur)
+print(carte_temperature)
+carte_hauteur,carte_riviere=appliquer_erosion_agents(carte_hauteur,carte_temperature)
 carte_ressources=generer_carte_ressources(longueur, largeur)
 carte_sol=generer_carte_sol(longueur, largeur)
 carte_humide=generer_carte_humidite(longueur, largeur)
-carte_temperature=generer_carte_temperature(longueur, largeur, carte_hauteur)
 carte_vegetation=generer_carte_vegetation(longueur, largeur, carte_humide, carte_temperature)
 monde=generer_monde_final_avec_rivieres(longueur, largeur, carte_hauteur, carte_temperature, carte_humide, carte_vegetation, carte_sol, carte_ressources, carte_riviere)
 afficher_monde_couleur(monde)
-gestion_db.create_db_monde(nom)
-gestion_db.ajoute_info(nom,longueur,largeur)
-enregistrer_monde(nom,monde)
+#gestion_db.create_db_monde(nom)
+#gestion_db.ajoute_info(nom,longueur,largeur)
+#enregistrer_monde(nom,monde)

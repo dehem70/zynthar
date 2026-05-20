@@ -3,7 +3,7 @@ import sqlite3
 def create_db_monde(nom):
    cnx=sqlite3.connect(nom+".db")
    c=cnx.cursor()
-   req="CREATE TABLE IF NOT EXISTS tuiles (num INTEGER PRIMARY KEY, x INTEGER,y INTEGER, type INTEGER, biome INTEGER, sol INTEGER, objet INTEGER)"
+   req="CREATE TABLE IF NOT EXISTS tuiles (num INTEGER PRIMARY KEY, x INTEGER,y INTEGER, type INTEGER, biome INTEGER, sol INTEGER, objet INTEGER,altitude INTEGER,temperature FLOAT,humidite FLOAT)"
    c.execute(req)
    req="CREATE TABLE IF NOT EXISTS info (nom TEXT PRIMARY KEY, xmax INTEGER, ymax INTEGER)"
    c.execute(req)
@@ -65,7 +65,7 @@ def ajoute_info(nom,xmax,ymax):
    cnx.close()
    return True
 
-def ajoute_tuile(nom,x,y,typ,biome,sol,objet):
+def ajoute_tuile(nom,x,y,typ,biome,sol,objet,altitude,temperature,humidite):
    cnx=sqlite3.connect(nom+".db")
    c=cnx.cursor()
    list_type=[]
@@ -110,7 +110,7 @@ def ajoute_tuile(nom,x,y,typ,biome,sol,objet):
       id_sol=list_sol.index(sol)
 
    try:
-      req='INSERT INTO tuiles VALUES ('+str(num_tuile)+','+str(x)+','+str(y)+','+str(id_type)+','+str(id_biome)+','+str(id_sol)+','+str(id_objet)+')'
+      req='INSERT INTO tuiles VALUES ('+str(num_tuile)+','+str(x)+','+str(y)+','+str(id_type)+','+str(id_biome)+','+str(id_sol)+','+str(id_objet)+str(int(altitude))+','+str(temperature)+','+str(humidite)+')'
       c.execute(req)
       cnx.commit()
    except:
