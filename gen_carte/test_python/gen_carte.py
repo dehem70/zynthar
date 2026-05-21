@@ -14,8 +14,6 @@ longueur=1000
 nb_iles=4
 nom="test"
 
-
-import random
 from matplotlib.colors import LightSource
 
 def generer_monde_final_avec_rivieres(width, height, c_hauteur, c_temp, c_humidite, c_veg, c_sol, c_res, c_riviere):
@@ -168,33 +166,6 @@ def afficher_monde_couleur(monde_final):
     print(f"Fichier sauvegardé : {nom_fichier}")
     plt.close() # Ferme la figure pour libérer la mémoire
 
-
-def afficher_carte_erosion(carte_hauteur):
-    """
-    Affiche la carte avec un effet d'ombrage (hillshading)
-    pour révéler les sillons et vallées creusés par les rivières.
-    """
-    hauteur_np = np.array(carte_hauteur)
-    
-    plt.figure(figsize=(12, 10))
-    
-    # 1. Création d'une source de lumière artificielle (éclairage par le Nord-Ouest)
-    ls = LightSource(azdeg=315, altdeg=45)
-    
-    # 2. Application de l'ombrage sur la carte de hauteur
-    # Le paramètre vert_exag (exagération verticale) permet de forcer le trait 
-    # des ombres pour bien voir les lits des rivières.
-    rgb = ls.shade(hauteur_np, cmap=plt.cm.terrain, blend_mode='overlay', vert_exag=5.0)
-    
-    plt.imshow(rgb)
-    plt.title("Relief après Érosion Hydraulique (Ombrage de colline)")
-    plt.axis('off')
-    nom_fichier="hauteur_erodé"    
-
-    plt.savefig(nom_fichier)
-    print(f"Fichier sauvegardé : {nom_fichier}")
-    plt.close() # Ferme la figure pour libérer la mémoire
-
 def calculer_pente_et_direction(x, y, carte_hauteur, width, height):
     """
     Trouve le voisin le plus bas autour de (x, y) pour déterminer la pente et la direction.
@@ -220,8 +191,6 @@ def calculer_pente_et_direction(x, y, carte_hauteur, width, height):
                 meilleur_dx, meilleur_dy = dx, dy
                 
     return pente_max, meilleur_dx, meilleur_dy
-
-import random
 
 def generer_carte_binaire(carte_hauteur):
 
@@ -551,135 +520,6 @@ def generate_voronoi_map(width, height, num_islands):
             
     return voronoi_grid
 
-def afficher_carte_binaire(carte_hauteur):
-    """
-    Affiche la carte avec seulement deux couleurs.
-    - Bleu pour les zones maritimes (valeurs < 0)
-    - Marron pour les zones terrestres (valeurs >= 0)
-    """
-    # 1. Conversion de la liste de listes en tableau NumPy pour plus d'efficacité
-    hauteur_np = np.array(carte_hauteur)
-    
-    # 2. Création d'une image vide (Hauteur x Largeur x 3 canaux RVB)
-    height, width = hauteur_np.shape
-    image_rgb = np.zeros((height, width, 3))
-    
-    # 3. Application du seuil (Cutoff)
-    # Les sources indiquent que les valeurs proches de 0 sont des zones côtières [2]
-    # On définit ici le niveau de la mer strictement à 0 [3]
-    
-    # Zone maritime (Bleu)
-    image_rgb[hauteur_np <= 0] = [0.1, 0.4, 0.8]   # Bleu océan
-    
-    # Zone terrestre (Marron)
-    image_rgb[hauteur_np > 0] = [0.45, 0.25, 0.0] # Marron terre
-    
-    # 4. Rendu visuel
-    plt.figure(figsize=(10, 10))
-    plt.imshow(image_rgb)
-    plt.title("Carte de Chasse au Trésor (Vue Simplifiée)")
-    plt.axis('off') # Masquer les axes pour l'aspect esthétique
-    nom_fichier="hauteur"    
-
-    plt.savefig(nom_fichier)
-    print(f"Fichier sauvegardé : {nom_fichier}")
-    plt.close() # Ferme la figure pour libérer la mémoire
-
-def afficher_carte_temperature(carte_temp):
-    """
-    Affiche la distribution de la chaleur sur la carte.
-    - Bleu : Zones froides / Arctiques
-    - Jaune/Vert : Zones tempérées
-    - Rouge : Zones tropicales / Désertiques
-    """
-    temp_np = np.array(carte_temp)
-    
-    # Normalisation entre 0 et 1 pour l'affichage
-    t_min, t_max = temp_np.min(), temp_np.max()
-    temp_norm = (temp_np - t_min) / (t_max - t_min + 1e-6)
-
-    plt.figure(figsize=(12, 10))
-    
-    # L'utilisation du colormap 'coolwarm' ou 'RdYlBu_r' est idéale
-    # car elle représente naturellement les gradients thermiques [1]
-    plt.imshow(temp_norm, cmap='RdYlBu_r') 
-    
-    plt.colorbar(label="Indice de Température (Froid -> Chaud)")
-    plt.title("Carte Thermique Procédurale")
-    plt.axis('off')
-    nom_fichier="temperature"    
-
-    plt.savefig(nom_fichier)
-    print(f"Fichier sauvegardé : {nom_fichier}")
-    plt.close() # Ferme la figure pour libérer la mémoire
-
-
-def afficher_carte_tresor_couleurs(carte_hauteur):
-    """
-    Affiche une carte avec des dégradés :
-    - Bleu : profondeur marine (foncé vers clair)
-    - Marron à Blanc : relief terrestre (côte vers sommets)
-    """
-    hauteur_np = np.array(carte_hauteur)
-    height, width = hauteur_np.shape
-    image_rgb = np.zeros((height, width, 3))
-
-    # 1. GESTION DES MERS (Valeurs <= 0)
-    # On normalise les valeurs négatives entre 0 (abysses) et 1 (côte)
-    masque_mer = hauteur_np <= 0
-    profondeur = (hauteur_np[masque_mer] - hauteur_np.min()) / (0 - hauteur_np.min() + 1e-6)
-    
-    # Dégradé : Bleu très foncé [0, 0, 0.3] vers Bleu lagon [0.2, 0.6, 1.0]
-    image_rgb[masque_mer, 0] = 0.2 * profondeur       # Rouge
-    image_rgb[masque_mer, 1] = 0.4 * profondeur + 0.2 # Vert
-    image_rgb[masque_mer, 2] = 0.7 * profondeur + 0.3 # Bleu
-
-    # 2. GESTION DES TERRES (Valeurs > 0)
-    # On normalise les valeurs positives entre 0 (côte) et 1 (sommet)
-    masque_terre = hauteur_np > 0
-    altitude = hauteur_np[masque_terre] / (hauteur_np.max() + 1e-6)
-    
-    # Dégradé : Marron [0.45, 0.25, 0] vers Blanc [5]
-    # Formule : Couleur = (1 - alt) * Marron + (alt * Blanc)
-    image_rgb[masque_terre, 0] = (1 - altitude) * 0.45 + (altitude * 1.0)
-    image_rgb[masque_terre, 1] = (1 - altitude) * 0.25 + (altitude * 1.0)
-    image_rgb[masque_terre, 2] = (1 - altitude) * 0.00 + (altitude * 1.0)
-
-    # Affichage final
-    plt.figure(figsize=(12, 10))
-    plt.imshow(image_rgb)
-    plt.title("Carte de Chasse au Trésor : Relief et Profondeur")
-    plt.axis('off')
-    nom_fichier="hauteur"    
-
-    plt.savefig(nom_fichier)
-    print(f"Fichier sauvegardé : {nom_fichier}")
-    plt.close() # Ferme la figure pour libérer la mémoire
-
-def afficher_carte_degrade(carte, titre="Carte de Hauteur"):
-    """
-    Affiche une matrice 2D avec un dégradé de couleur.
-    :param carte: La grille de valeurs (liste de listes ou array NumPy).
-    :param titre: Le nom de la carte à afficher.
-    """
-    plt.figure(figsize=(10, 8))
-    
-    # On utilise 'terrain' pour la hauteur car il gère le bleu (négatif) 
-    # et le vert/brun (positif) [1]. 
-    # Pour la température, 'hot' ou 'RdBu_r' seraient plus adaptés.
-    img = plt.imshow(carte, cmap='Blues_r', vmin=-1, vmax=1)
-    
-    # Ajout d'une barre de légende pour lire les valeurs [4].
-    plt.colorbar(img, label='Intensité des valeurs (-1 à 1)')
-    
-    plt.title(titre)
-    plt.axis('off') # Cache les coordonnées x, y pour un aspect "carte"
-    
-    nom_fichier="hauteur"    
-
-    plt.savefig(nom_fichier)
-    print(f"Fichier sauvegardé : {nom_fichier}")
-    plt.close() # Ferme la figure pour libérer la mémoire
 
 def fade(t):
     # Fonction de lissage (6t^5 - 15t^4 + 10t^3) [6]
@@ -749,59 +589,6 @@ def fractal_noise(x, y, octaves, persistence, lacunarity=2.0):
     # Normalisation pour rester dans l'intervalle [-1, 1] [5]
     return total / max_amplitude
 
-def generate_map(width, height):
-    """
-    Génère une carte 2D unique avec échelle, graine et offsets aléatoires.
-    """
-    # 1. ÉCHELLE ALÉATOIRE (Scale)
-    # Entre 0.01 (grandes formes étirées) et 0.1 (détails plus fréquents)
-    scale = random.uniform(0.01, 0.02)
-
-    # 2. SEED ET TABLE DE PERMUTATION
-    seed_value = random.randint(0, 1000000)
-    random.seed(seed_value)
-    
-    # On mélange la table de permutation 'p' (définie précédemment)
-    p=[]
-    for i in range(1,255):
-       p.append(i)
-    print(p)
-    random.shuffle(p)
-    print(p)
-    global perm
-    
-    perm = p + p + p 
-    print(perm)
-    # 3. OFFSETS ALÉATOIRES
-    offset_x = random.uniform(-100000, 100000)
-    offset_y = random.uniform(-100000, 100000)
-
-    grid = []
-    for y in range(height):
-        row = []
-        for x in range(width):
-            # 1. Calcul de la distance au centre (normalisée de 0 à 1)
-            # 0 = centre, 1 = bord
-            dist_x = abs(x - width / 2) / (width / 2)
-            dist_y = abs(y - height / 2) / (height / 2)
-            distance = max(dist_x, dist_y) # Masque carré
-            
-            # 2. Création de la valeur du masque (plus on est loin, plus c'est bas)
-            # Cette formule peut être ajustée pour rendre l'île plus ou moins grande
-            masque = 1 - (distance ** 2) # Dégradé parabolique
-            
-            # 3. Application sur le bruit fractal
-            nx = (x + offset_x) * scale
-            ny = (y + offset_y) * scale
-            val_bruit = fractal_noise(nx, ny, 5,0.4)
-            
-            # On combine : le masque force les bords vers des valeurs négatives (< 0)
-            # Ainsi, votre fonction d'affichage les peindra en bleu (mer)
-            val_finale = val_bruit + (masque * 2 - 1) 
-            
-            row.append(val_finale)
-        grid.append(row)
-    return grid, scale # On retourne aussi le scale utilisé pour info
 
 def generate_map_fractale(width, height, octaves=6, persistence=0.5):
     """
@@ -837,26 +624,6 @@ def generate_map_fractale(width, height, octaves=6, persistence=0.5):
         
     return grid
 
-def generer_archipel(width, height, num_graines, octaves=6, persistence=0.5):
-    # 1. Générer la base structurelle (Voronoi)
-    # On crée des zones d'influence circulaires autour de points aléatoires
-    carte_voronoi = generate_voronoi_map(width, height, num_graines)
-    
-    # 2. Générer le détail organique (Perlin Fractal)
-    # On utilise une échelle assez fine pour les détails des côtes
-    carte_relief = generate_map_fractale(width, height, octaves, persistence)
-    carte_relief = np.array(carte_relief) # Conversion pour calcul matriciel
-
-    # 3. Fusion Mathématique
-    # On multiplie le relief par la puissance de Voronoi
-    # Cela force la mer entre les zones d'influence des graines
-    archipel = (carte_relief + 0.5) * carte_voronoi
-    
-    # 4. Normalisation et Seuil (Cutoff)
-    # On ajuste pour que le niveau 0 sépare bien l'eau de la terre
-    archipel = archipel - 0.3 
-    
-    return archipel
 
 def enregistrer_monde(nom,monde):
    for x in range(longueur):
