@@ -1,0 +1,110 @@
+[ Début de la Génération ]
+                   |
+                   v
+       +-----------------------+
+       |   Initialisation de   |
+       |  la graine (Seed/PERM)|
+       +-----------------------+
+                   |
+         +---------+---------+---------------------------------+
+         |                   |                                 |
+         v                   v                                 v
+  +--------------+    +--------------+                  +--------------+
+  | Bruit Perlin |    |  Diagramme   |                  | Bruit Perlin |
+  |   Fractal    |    |  de Voronoi  |                  |   Fractal    |
+  | (Relief Brut)|    | (Masses Iles)|                  | (Humidité)   |
+  +--------------+    +--------------+                  +--------------+
+         |                   |                                 |
+         +---------+---------+                                 |
+                   |                                           |
+                   v                                           |
+  +----------------------------------+                         |
+  |   Fusion (Relief + Voronoi)      |                         |
+  |  - Calibrage du niveau de la mer |                         |
+  +----------------------------------+                         |
+                   |                                           |
+                   v                                           |
+  +----------------------------------+                         |
+  |   Masque Binaire (Terre / Mer)   |                         |
+  +----------------------------------+                         |
+                   |                                           |
+                   v                                           |
+  +----------------------------------+                         |
+  |   Automate Cellulaire (Lissage)  |                         |
+  +----------------------------------+                         |
+                   |                                           |
+                   v                                           |
+  +----------------------------------+                         |
+  |    Recomposition du Relief       |                         |
+  |  (Hauteur finale de l'Archipel)  |                         |
+  +----------------------------------+                         |
+                   |                                           |
+                   v                                           |
+  +----------------------------------+                         |
+  |      Carte de Température        |                         |
+  | (Bruit + Altitude + Latitude)    |                         |
+  +----------------------------------+                         |
+                   |                                           |
+                   +-------------------+-----------------------+
+                   |                   |                       |
+                   v                   v                       v
+  +----------------------------------+ |                +--------------+
+  | Simulation d'Érosion Hydraulique | |                | Bruit Perlin |
+  |  - Modifie la carte de Hauteur   | |                |  (Géologie)  |
+  |  - Génère le Flux de Rivière     | |                +--------------+
+  +----------------------------------+ |                       |
+                   |                   |                       v
+                   |                   |                +--------------+
+                   |                   |                | Bruit Perlin |
+                   |                   |                | (Ressources) |
+                   |                   |                +--------------+
+                   |                   |                       |
+                   |                   v                       |
+                   |            +--------------+               |
+                   |            | Carte de     |               |
+                   |            | Végétation   |               |
+                   |            | (Humidité *  |               |
+                   |            | Température) |               |
+                   |            +--------------+               |
+                   |                   |                       |
+                   v                   v                       v
+  =======================================================================
+                        [ COMPILATION DU MONDE FINAL ]
+     Analyse de chaque coordonnée (X, Y) à travers toutes les cartes :
+  =======================================================================
+                                       |
+                                       v
+                             Est-ce sous l'eau ?
+                                /           \
+                             (Oui)         (Non)
+                              /               \
+              +---------------------+       +-----------------------+
+              | Biome : Océan       |       | Biome : Climat        |
+              | (Profond / Côtier)  |       | (Whittaker : Jungle,  |
+              |                     |       | Désert, Forêt...)     |
+              | Si flux d'eau élevé |       |                       |
+              | -> Biome : Rivière  |       | Surcharge Altitude    |
+              +---------------------+       | (Plage, Montagne,     |
+                                            | Pic Enneigé)          |
+                                            |                       |
+                                            | Nature du Sol         |
+                                            | (Roche, Sable, Terre) |
+                                            |                       |
+                                            | Spawn d'Objets        |
+                                            | (Minerais ou Flore)   |
+                                            +-----------------------+
+                                       |                /
+                                       v               v
+                        +----------------------------------+
+                        |  Création du dictionnaire Case   |
+                        |      (Matrice 2D "Monde")        |
+                        +----------------------------------+
+                                       |
+                                       v
+                        +----------------------------------+
+                        |    Affichage Visuel (RGB)        |
+                        |  & Sauvegarde en Base SQLite     |
+                        +----------------------------------+
+                                       |
+                                       v
+                                  [ Fin ]
