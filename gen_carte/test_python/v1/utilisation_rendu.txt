@@ -1,0 +1,8 @@
+dans le répertoire ou il y a les documents, lancer un mini serveur web local python
+python3 -m http.server 8000
+
+Dans le navigateur, aller sur la page 
+http://localhost:8000/
+
+cliquer avec la souris dans la fenetre.
+La souris gère l'orientation de la vue, alors que les fleches gerent le déplacement
