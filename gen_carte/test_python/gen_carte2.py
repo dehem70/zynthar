@@ -585,7 +585,7 @@ def generer_monde_final_avec_rivieres(
             ligne.append(case)
         monde.append(ligne)
 
-    return monde
+    return monde,hauteur_maxi
 
 
 # =============================================================================
@@ -691,7 +691,38 @@ def enregistrer_monde(nom, monde):
                 LONGUEUR 
             )
 
+from PIL import Image
 
+def generer_fichiers_terrain(tableau_monde, largeur, hauteur,hmax):
+    # 1. Créer les deux images vides
+    img_altitude = Image.new("L", (largeur, hauteur))      # Niveaux de gris (8-bit)
+    img_texture = Image.new("RGB", (largeur, hauteur))     # Couleur (Rouge, Vert, Bleu)
+    
+    pixels_alt = img_altitude.load()
+    pixels_tex = img_texture.load()
+    
+    for y in range(hauteur):
+        for x in range(largeur):
+            case = tableau_monde[y][x]
+            
+            # --- 1. Gestion de la hauteur ---
+            # Conversion de votre altitude logique (0.0 à 1.0) en octet (0 à 255)
+            pixels_alt[x, y] = int(case['altitude']/hmax * 255)
+            
+            # --- 2. Gestion de la nature du terrain ---
+            if case['type'] == 'roche':
+                pixels_tex[x, y] = (255, 0, 0)      # Rouge pur pour la roche
+            elif case['type'] == 'HERBE':
+                pixels_tex[x, y] = (0, 255, 0)      # Vert pur pour l'herbe
+            elif case['type'] == 'sable':
+                pixels_tex[x, y] = (0, 0, 255)      # Bleu pur pour le sable
+            else:
+                pixels_tex[x, y] = (0, 0, 0)        # Noir par défaut
+                
+    # Sauvegarde des fichiers pour votre projet Babylon.js
+    img_altitude.save("terrain_heightmap.png")
+    img_texture.save("terrain_splatmap.png")
+    
 # =============================================================================
 # POINT D'ENTRÉE PRINCIPAL (MAINEXECUTION)
 # =============================================================================
@@ -719,7 +750,7 @@ if __name__ == "__main__":
 
     # 4. Compilation du monde sous forme de dictionnaire structuré
     print("Compilation du monde...")
-    monde = generer_monde_final_avec_rivieres(
+    monde,hmax = generer_monde_final_avec_rivieres(
         LONGUEUR,
         LARGEUR,
         carte_hauteur,
@@ -733,10 +764,11 @@ if __name__ == "__main__":
 
     # 5. Visualisation graphique
     afficher_monde_couleur(monde)
+    generer_fichiers_terrain(monde, LONGUEUR, LARGEUR,hmax)
 
     # 6. Sauvegarde en Base de Données (Décommenter au besoin)
-    print("Exportation vers la base de données...")
-    gestion_db.create_db_monde(NOM_MONDE)
-    gestion_db.ajoute_info(NOM_MONDE, LONGUEUR, LARGEUR)
-    enregistrer_monde(NOM_MONDE, monde)
+    #print("Exportation vers la base de données...")
+    #gestion_db.create_db_monde(NOM_MONDE)
+    #gestion_db.ajoute_info(NOM_MONDE, LONGUEUR, LARGEUR)
+    #enregistrer_monde(NOM_MONDE, monde)
     print("--- Génération terminée avec succès ---")

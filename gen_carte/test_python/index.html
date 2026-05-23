@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exploration 3D - Flottaison sur l'Eau</title>
+    <style>
+        html, body {
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: #e6ecf2;
+        }
+        #renderCanvas {
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 6px;
+            height: 6px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+    </style>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+</head>
+<body>
+
+    <div id="crosshair"></div>
+    <canvas id="renderCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById("renderCanvas");
+        const engine = new BABYLON.Engine(canvas, true);
+
+        // Références globales pour y accéder dans la boucle de rendu
+        let camera;
+        const WATER_LEVEL = 0.0; // Altitude de la surface de l'eau
+        const PLAYER_HEIGHT = 1.8; // Taille des yeux du joueur par rapport à ses pieds
+
+        const createScene = function () {
+            const scene = new BABYLON.Scene(engine);
+
+            // ==========================================
+            // 1. CONFIGURATION DU BROUILLARD LUMINEUX
+            // ==========================================
+            const lightFogColor = new BABYLON.Color3(0.85, 0.9, 0.95);
+            scene.clearColor = lightFogColor; 
+
+            scene.fogMode = BABYLON.Scene.FOGMODE_LINEAR;
+            scene.fogColor = lightFogColor;
+            scene.fogStart = 2.0;  
+            scene.fogEnd = 100;   
+
+            // ==========================================
+            // 2. CONFIGURATION PHYSIQUE ET LUMIÈRES
+            // ==========================================
+            scene.collisionsEnabled = true;
+            scene.gravity = new BABYLON.Vector3(0, -0.15, 0);
+
+            const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+            light.intensity = 0.7;
+            light.groundColor = new BABYLON.Color3(0.2, 0.3, 0.1);
+
+            const sunLight = new BABYLON.DirectionalLight("sunLight", new BABYLON.Vector3(-0.5, -1, -0.5), scene);
+            sunLight.intensity = 0.8;
+
+            // ==========================================
+            // 3. CONFIGURATION DE L'EAU (ALTITUDE 0)
+            // ==========================================
+            const water = BABYLON.MeshBuilder.CreateGround("water", { width: 200, height: 200 }, scene);
+            water.position.y = WATER_LEVEL; 
+            
+            const waterMaterial = new BABYLON.StandardMaterial("waterMat", scene);
+            waterMaterial.diffuseColor = new BABYLON.Color3(0.1, 0.6, 0.8); 
+            waterMaterial.specularColor = new BABYLON.Color3(0.5, 0.5, 0.5); 
+            waterMaterial.alpha = 0.6; 
+            water.material = waterMaterial;
+
+            // ==========================================
+            // 4. CONFIGURATION DE LA CAMÉRA FPS
+            // ==========================================
+            camera = new BABYLON.UniversalCamera("cameraFPS", new BABYLON.Vector3(0, 40, 0), scene);
+            camera.attachControl(canvas, true);
+
+            camera.keysUp.push(90);    
+            camera.keysDown.push(83);  
+            camera.keysLeft.push(81);  
+            camera.keysRight.push(68); 
+
+            camera.speed = 0.8; 
+            camera.angularSensibility = 2000; 
+            
+            camera.checkCollisions = true;
+            camera.applyGravity = true;
+            camera.ellipsoid = new BABYLON.Vector3(1, PLAYER_HEIGHT, 1); 
+
+            canvas.addEventListener("click", () => {
+                canvas.requestPointerLock();
+            });
+
+            // ==========================================
+            // 5. MATÉRIAU ET CHARGEMENT DU TERRAIN
+            // ==========================================
+            const terrainMaterial = new BABYLON.StandardMaterial("terrainMat", scene);
+            terrainMaterial.diffuseColor = new BABYLON.Color3(0.4, 0.7, 0.3);
+            terrainMaterial.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
+
+            const terrain = BABYLON.MeshBuilder.CreateGroundFromHeightMap(
+                "terrainProcedural", 
+                "terrain_heightmap.png", 
+                {
+                    width: 1000,          
+                    height: 500, 
+                    subdivisions: 250,   
+                    maxHeight: 50,       
+                    minHeight: -0.1,  
+                    onReady: function(mesh) {
+                        mesh.checkCollisions = true;
+                        
+                        camera.position.x = 0;
+                        camera.position.z = 0;
+                        
+                        let spawnY = mesh.getHeightAtCoordinates(0, 0);
+                        // Sécurité au démarrage : on force l'altitude au-dessus du niveau de l'eau
+                        camera.position.y = (spawnY < WATER_LEVEL ? WATER_LEVEL : spawnY) + PLAYER_HEIGHT;
+                        
+                        console.log("Monde chargé ! Sécurité anti-noyade activée.");
+                    }
+                }, 
+                scene
+            );
+            terrain.material = terrainMaterial;
+
+            // ==========================================
+            // 6. BOUCLE DE VÉRIFICATION AVANT RENDU
+            // ==========================================
+            // Cette fonction tourne en boucle juste avant de dessiner l'image
+            scene.registerBeforeRender(function () {
+                if (camera) {
+                    // Calcul de la position minimale autorisée pour les yeux (Niveau de l'eau + hauteur du regard)
+                    const limiteHauteurYeux = WATER_LEVEL + PLAYER_HEIGHT;
+                    
+                    if (camera.position.y < limiteHauteurYeux) {
+                        camera.position.y = limiteHauteurYeux;
+                    }
+                }
+            });
+
+            return scene;
+        };
+
+        const scene = createScene();
+
+        engine.runRenderLoop(function () {
+            scene.render();
+        });
+
+        window.addEventListener("resize", function () {
+            engine.resize();
+        });
+    </script>
+</body>
+</html>
