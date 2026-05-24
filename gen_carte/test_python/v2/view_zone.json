@@ -1,0 +1,808 @@
+{
+    "macro_coords": {
+        "x": 5,
+        "y": 5
+    },
+    "tiles": [
+        {
+            "mx": 0,
+            "my": 0,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 0,
+            "my": 1,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 0,
+            "my": 2,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 0,
+            "my": 3,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 0,
+            "my": 4,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 0,
+            "my": 5,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 0,
+            "my": 6,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 0,
+            "my": 7,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 0,
+            "my": 8,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 0,
+            "my": 9,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 1,
+            "my": 0,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 1,
+            "my": 1,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 1,
+            "my": 2,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 1,
+            "my": 3,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 1,
+            "my": 4,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 1,
+            "my": 5,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 1,
+            "my": 6,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 1,
+            "my": 7,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 1,
+            "my": 8,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 1,
+            "my": 9,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 2,
+            "my": 0,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 2,
+            "my": 1,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 2,
+            "my": 2,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 2,
+            "my": 3,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 2,
+            "my": 4,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 2,
+            "my": 5,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 2,
+            "my": 6,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 2,
+            "my": 7,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 2,
+            "my": 8,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 2,
+            "my": 9,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 3,
+            "my": 0,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 3,
+            "my": 1,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 3,
+            "my": 2,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 3,
+            "my": 3,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 3,
+            "my": 4,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 3,
+            "my": 5,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 3,
+            "my": 6,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 3,
+            "my": 7,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 3,
+            "my": 8,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 3,
+            "my": 9,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 4,
+            "my": 0,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 4,
+            "my": 1,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 4,
+            "my": 2,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 4,
+            "my": 3,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 4,
+            "my": 4,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 4,
+            "my": 5,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 4,
+            "my": 6,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 4,
+            "my": 7,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 4,
+            "my": 8,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 4,
+            "my": 9,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 5,
+            "my": 0,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 5,
+            "my": 1,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 5,
+            "my": 2,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 5,
+            "my": 3,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 5,
+            "my": 4,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 5,
+            "my": 5,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 5,
+            "my": 6,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 5,
+            "my": 7,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 5,
+            "my": 8,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 5,
+            "my": 9,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 6,
+            "my": 0,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 6,
+            "my": 1,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 6,
+            "my": 2,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 6,
+            "my": 3,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 6,
+            "my": 4,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 6,
+            "my": 5,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 6,
+            "my": 6,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 6,
+            "my": 7,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 6,
+            "my": 8,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 6,
+            "my": 9,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 7,
+            "my": 0,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 7,
+            "my": 1,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 7,
+            "my": 2,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 7,
+            "my": 3,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 7,
+            "my": 4,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 7,
+            "my": 5,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 7,
+            "my": 6,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 7,
+            "my": 7,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 7,
+            "my": 8,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 7,
+            "my": 9,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 8,
+            "my": 0,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 8,
+            "my": 1,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 8,
+            "my": 2,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 8,
+            "my": 3,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 8,
+            "my": 4,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 8,
+            "my": 5,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 8,
+            "my": 6,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 8,
+            "my": 7,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 8,
+            "my": 8,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 8,
+            "my": 9,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 9,
+            "my": 0,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 9,
+            "my": 1,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 9,
+            "my": 2,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 9,
+            "my": 3,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 9,
+            "my": 4,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 9,
+            "my": 5,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 9,
+            "my": 6,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 9,
+            "my": 7,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 9,
+            "my": 8,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        },
+        {
+            "mx": 9,
+            "my": 9,
+            "terrain": "plain",
+            "walkable": 1,
+            "resource": null,
+            "abundance": 0.0
+        }
+    ]
+}

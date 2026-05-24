@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Streaming Terrain Lisse Stable - Babylon.js</title>
+    <style>
+        html, body { overflow: hidden; width: 100%; height: 100%; margin: 0; padding: 0; }
+        #renderCanvas { width: 100%; height: 100%; touch-action: none; }
+        #uiPanel { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.85); color: #00ffcc; padding: 15px; font-family: monospace; border-radius: 5px; border: 1px solid #00ffcc; pointer-events: none; z-index: 10; }
+    </style>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+</head>
+<body>
+    <div id="uiPanel">
+        <h3 style="margin-top:0;">📡 RENDU TERRAIN LISSE PROCÉDURAL</h3>
+        <div id="macroPos">Chunk Actuel : Initialisation...</div>
+        <div id="microPos">Position Absolue : X=550.0, Z=550.0</div>
+        <div id="worldBounds" style="color: #ffcc00; margin-top: 5px;">Bords Monde : Configurés [0m - 10000m]</div>
+    </div>
+    <canvas id="renderCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById("renderCanvas");
+        const engine = new BABYLON.Engine(canvas, true);
+        const API_URL = "http://127.0.0.1:8000/api/world";
+
+        let loadedChunks = {}; 
+        let globalHeightsMap = {}; 
+        let currentCentreX = 5;
+        let currentCentreY = 5;
+        let isLambdaLoading = false;
+
+        // Variables de suivi de secteur pour bloquer le spam API
+        let lastTrackedChunkX = 5;
+        let lastTrackedChunkY = 5;
+
+        // Limites fixes directes (Monde de 100x100 chunks -> 0 à 10000 mètres)
+        const worldMinX = 0;
+        const worldMaxX = 10000;
+        const worldMinZ = 0;
+        const worldMaxZ = 10000;
+
+        const createScene = function () {
+            const scene = new BABYLON.Scene(engine);
+            scene.clearColor = new BABYLON.Color3(0.6, 0.8, 1.0); 
+
+            scene.gravity = new BABYLON.Vector3(0, -9.81, 0);
+            scene.collisionsEnabled = true;
+
+// CONFIGURATION DE LA CAMÉRA (Glissement tout-terrain)
+const camera = new BABYLON.UniversalCamera("playerCam", new BABYLON.Vector3(550, 25, 550), scene);
+camera.setTarget(new BABYLON.Vector3(550, 25, 560));
+camera.attachControl(canvas, true);
+
+camera.speed = 2.0;
+camera.angularSensibility = 2000;
+camera.keysUp.push(90); camera.keysDown.push(83); // Z, S
+camera.keysLeft.push(81); camera.keysRight.push(68); // Q, D
+
+// On élargit légèrement l'ellipsoïde pour stabiliser l'assise sur le maillage
+camera.ellipsoid = new BABYLON.Vector3(1.2, 1.8, 1.2);
+
+// L'OFFSET D'ENJAMBEMENT : En remontant le centre de gravité à 0.9m,
+// le bas de la caméra agit comme un biseau amortisseur. 
+// Les petites imperfections ou décalages aux frontières sont absorbés automatiquement.
+camera.ellipsoidOffset = new BABYLON.Vector3(0, 0.9, 0); 
+
+camera.checkCollisions = true;
+camera.applyGravity = true;
+            canvas.addEventListener("click", () => { canvas.requestPointerLock(); });
+
+            const light = new BABYLON.HemisphericLight("ambient", new BABYLON.Vector3(0, 1, 0), scene);
+            light.intensity = 0.9;
+
+            const terrainMat = new BABYLON.StandardMaterial("terrainMat", scene);
+            terrainMat.backFaceCulling = false;
+            terrainMat.specularColor = new BABYLON.Color3(0, 0, 0);
+
+            const biomeColors = {
+                "plain": new BABYLON.Color4(0.3, 0.8, 0.3, 1.0),
+                "forest": new BABYLON.Color4(0.1, 0.5, 0.1, 1.0),
+                "mountain": new BABYLON.Color4(0.5, 0.5, 0.5, 1.0),
+                "ocean": new BABYLON.Color4(0.1, 0.4, 0.9, 1.0),
+                "default": new BABYLON.Color4(1.0, 1.0, 1.0, 1.0)
+            };
+
+            // RECALAGE PHYSIQUE SUR LE MAILLAGE LISSE
+function ajusterHauteurJoueurSurRelief() {
+    const posX = camera.position.x;
+    const posZ = camera.position.z;
+    const cx = Math.floor(posX / 100);
+    const cy = Math.floor(posZ / 100);
+    const key = `${cx}_${cy}`;
+
+    if (globalHeightsMap[key]) {
+        let mx = Math.floor((posX - (cx * 100)) / 10);
+        let my = Math.floor((posZ - (cy * 100)) / 10);
+        mx = Math.max(0, Math.min(9, mx));
+        my = Math.max(0, Math.min(9, my));
+
+        const hauteurSol = globalHeightsMap[key][`${mx}_${my}`] || 2.0;
+
+        // PROTECTION DE CHUTE : Uniquement si le joueur traverse le vide abyssal (sous la map)
+        if (camera.position.y < (hauteurSol - 5.0)) {
+            camera.position.y = hauteurSol + 2.5;
+            if (camera._collider) camera._collider.velocity.set(0, 0, 0);
+        }
+    }
+}
+            // CRÉATION INSTANTANÉE DES MURS DE BORD DE MONDE (Plus de fetch bloquant !)
+            const wallThickness = 10;
+            const wallHeight = 400; 
+            const worldWidth = worldMaxX - worldMinX;
+            const worldLength = worldMaxZ - worldMinZ;
+            const wallMat = new BABYLON.StandardMaterial("wallMat", scene);
+            wallMat.alpha = 0.0;
+
+            const wallWest = BABYLON.MeshBuilder.CreateBox("wallWest", {width: wallThickness, height: wallHeight, depth: worldLength}, scene);
+            wallWest.position.set(worldMinX - (wallThickness / 2), wallHeight / 2, (worldMinZ + worldMaxZ) / 2);
+            wallWest.checkCollisions = true; wallWest.material = wallMat;
+
+            const wallEast = BABYLON.MeshBuilder.CreateBox("wallEast", {width: wallThickness, height: wallHeight, depth: worldLength}, scene);
+            wallEast.position.set(worldMaxX + (wallThickness / 2), wallHeight / 2, (worldMinZ + worldMaxZ) / 2);
+            wallEast.checkCollisions = true; wallEast.material = wallMat;
+
+            const wallSouth = BABYLON.MeshBuilder.CreateBox("wallSouth", {width: worldWidth, height: wallHeight, depth: wallThickness}, scene);
+            wallSouth.position.set((worldMinX + worldMaxX) / 2, wallHeight / 2, worldMinZ - (wallThickness / 2));
+            wallSouth.checkCollisions = true; wallSouth.material = wallMat;
+
+            const wallNorth = BABYLON.MeshBuilder.CreateBox("wallNorth", {width: worldWidth, height: wallHeight, depth: wallThickness}, scene);
+            wallNorth.position.set((worldMinX + worldMaxX) / 2, wallHeight / 2, worldMaxZ + (wallThickness / 2));
+            wallNorth.checkCollisions = true; wallNorth.material = wallMat;
+
+
+            // MOTEUR DE STREAMING 3X3 GÉOMÉTRIQUE LISSE
+            async function updateWorldStreaming(chunkCentreX, chunkCentreY) {
+                if (isLambdaLoading) return;
+                isLambdaLoading = true;
+
+                document.getElementById("macroPos").innerText = `⚡ CHARGEMENT DU RELIEF...`;
+
+                const targetChunks = [];
+                for (let dx = -1; dx <= 1; dx++) {
+                    for (let dy = -1; dy <= 1; dy++) {
+                        const tx = chunkCentreX + dx;
+                        const ty = chunkCentreY + dy;
+                        if (tx >= worldMinX/100 && tx < worldMaxX/100 && ty >= worldMinZ/100 && ty < worldMaxZ/100) {
+                            targetChunks.push({ x: tx, y: ty });
+                        }
+                    }
+                }
+
+                const requiredKeys = targetChunks.map(c => `${c.x}_${c.y}`);
+
+                for (let key in loadedChunks) {
+                    if (!requiredKeys.includes(key)) {
+                        loadedChunks[key].forEach(mesh => mesh.dispose());
+                        delete loadedChunks[key];
+                        delete globalHeightsMap[key];
+                    }
+                }
+
+                const promises = targetChunks.map(async (chunk) => {
+                    const key = `${chunk.x}_${chunk.y}`;
+                    if (loadedChunks[key]) return;
+
+                    loadedChunks[key] = [];
+                    globalHeightsMap[key] = {};
+
+                    try {
+                        const response = await fetch(`${API_URL}/chunk/${chunk.x}/${chunk.y}`);
+                        const data = await response.json();
+                        
+                        const offsetX = chunk.x * 100;
+                        const offsetZ = chunk.y * 100;
+
+                        const chunkGround = BABYLON.MeshBuilder.CreateGround(`ground_${key}`, {
+                            width: 100,
+                            height: 100,
+                            subdivisions: 10,
+                            updatable: true
+                        }, scene);
+
+// AJOUT DE CONFIGURATION POUR LE RAYCASTING :
+chunkGround.isPickable = true; 
+// 2. FORCE LA PHYSIQUE À IGNORER LA BOÎTE ENGLOBANTE (BOUNDING BOX)
+// Au lieu de créer un gros cube de collision invisible qui bloque le joueur à l'intérieur,
+// Babylon va tester la collision triangle par triangle (Sub-Mesh). C'est beaucoup plus précis !
+chunkGround.subMeshes.forEach(subMesh => {
+    subMesh.refreshBoundingInfo();
+});
+
+// 3. OPTIMISATION DU GLISSEMENT
+chunkGround.checkCollisions = true;
+
+                        chunkGround.position.set(offsetX + 50, 0, offsetZ + 50);
+                        chunkGround.material = terrainMat;
+
+// 1. Initialisation de la grille de hauteurs étendue (11x11)
+let gridHeights = Array(11).fill(0).map(() => Array(11).fill(2.0));
+let gridBiomes = Array(11).fill(0).map(() => Array(11).fill("plain"));
+
+// 2. Remplissage des données reçues depuis le JSON de l'API
+data.tiles.forEach(tile => {
+    const blockHeight = tile.height ? parseFloat(tile.height) : 2.0;
+    
+    // Sécurité de lecture des index pour éviter les débordements de tableau
+    if (tile.mx >= 0 && tile.mx <= 10 && tile.my >= 0 && tile.my <= 10) {
+        gridHeights[tile.mx][tile.my] = blockHeight;
+        // On récupère le biome (on vérifie .terrain puis .terrain_type par sécurité)
+        gridBiomes[tile.mx][tile.my] = tile.terrain || tile.terrain_type || "plain";
+    }
+    
+    // Enregistrement pour le moteur de collision physique (uniquement la zone de marche 0-9)
+    if (tile.mx < 10 && tile.my < 10) {
+        globalHeightsMap[key][`${tile.mx}_${tile.my}`] = blockHeight;
+    }
+});
+
+// 3. Application de la Heightmap et de la couleur sur le maillage
+const positions = chunkGround.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+const colors = [];
+
+let vIndex = 0;
+for (let row = 0; row <= 10; row++) {
+    for (let col = 0; col <= 10; col++) {
+        // Application de la hauteur calculée sur l'axe Y du point
+        positions[vIndex + 1] = gridHeights[col][10 - row]; 
+
+        // Récupération de la couleur du biome associé à ce point précis
+        let biomeNom = gridBiomes[col][10 - row];
+        let tColor = biomeColors[biomeNom] || biomeColors["default"];
+        
+        colors.push(tColor.r, tColor.g, tColor.b, tColor.a);
+        vIndex += 3;
+    }
+}
+
+// Appliquer les données au maillage
+chunkGround.setVerticesData(BABYLON.VertexBuffer.PositionKind, positions);
+chunkGround.setVerticesData(BABYLON.VertexBuffer.ColorKind, colors);
+
+// RECALCUL DES NORMALES POUR UN RENDU LISSE
+// En passant 'false', on évite le Flat Shaded facetté aux frontières
+chunkGround.createNormals(true); 
+chunkGround.refreshBoundingInfo();
+
+// Optionnel : Adoucir l'impact de la lumière sur les soudures
+chunkGround.forceSharedVertices();
+                        loadedChunks[key].push(chunkGround);
+
+                    } catch (e) {
+                        console.error(`Erreur création terrain maillé ${key}`, e);
+                    }
+                });
+
+                await Promise.all(promises);
+                
+                currentCentreX = chunkCentreX;
+                currentCentreY = chunkCentreY;
+                document.getElementById("macroPos").innerText = `Chunk Centre : X=${currentCentreX}, Y=${currentCentreY}`;
+                isLambdaLoading = false;
+
+                ajusterHauteurJoueurSurRelief();
+            }
+
+            // Chargement synchrone direct au boot
+            updateWorldStreaming(currentCentreX, currentCentreY);
+
+            // BOUCLE DE RENDU DU JEU
+ // BOUCLE DE RENDU ET SURVEILLANCE DES SECTEURS
+// BOUCLE DE RENDU DU JEU - SÉCURISÉE PAR RAYCASTING
+scene.registerBeforeRender(() => {
+    camera.rotation.x = 0; // Regard horizontal strict
+
+    const posX = camera.position.x;
+    const posZ = camera.position.z;
+
+    document.getElementById("microPos").innerText = `Position Absolue : X=${posX.toFixed(1)}, Z=${posZ.toFixed(1)}`;
+
+    const playerChunkX = Math.floor(posX / 100);
+    const playerChunkY = Math.floor(posZ / 100);
+
+    // 1. GESTION DU STREAMING 3X3
+    if ((playerChunkX !== lastTrackedChunkX || playerChunkY !== lastTrackedChunkY) && !isLambdaLoading) {
+        lastTrackedChunkX = playerChunkX;
+        lastTrackedChunkY = playerChunkY;
+        updateWorldStreaming(playerChunkX, playerChunkY);
+    }
+
+    // 2. LE RAYCASTING ANTI-PASSE-MURAILLE
+    // On lance un rayon vertical depuis le ciel vers le bas à la position X/Z du joueur
+// On fait partir le rayon de très haut (comme un satellite) pour surplomber les montagnes de 55m
+const rayOrigin = new BABYLON.Vector3(posX, camera.position.y + 50, posZ);
+const rayDirection = new BABYLON.Vector3(0, -1, 0);
+const length = 150; // On augmente la portée du rayon
+const ray = new BABYLON.Ray(rayOrigin, rayDirection, length);
+
+const pickInfo = scene.pickWithRay(ray, (mesh) => {
+    return mesh.name.startsWith("ground_");
+});
+
+if (pickInfo.hit && pickInfo.pickedPoint) {
+    const hauteurSolReelle = pickInfo.pickedPoint.y;
+    const hauteurYeuxCible = hauteurSolReelle + 2.5;
+
+    // Si on détecte qu'on est en train de descendre sous la surface (seuil critique relevé à +1.0m)
+    if (camera.position.y < (hauteurSolReelle + 1.0)) {
+        // Force le positionnement immédiat au-dessus de la maille graphique
+        camera.position.y = hauteurYeuxCible;
+        
+        if (camera._collider && camera._collider.velocity) {
+            camera._collider.velocity.y = 0; // Stop l'enfoncement
+        }
+    }
+}
+});
+            return scene;
+        };
+
+        const scene = createScene();
+        engine.runRenderLoop(() => { scene.render(); });
+        window.addEventListener("resize", () => { engine.resize(); });
+    </script>
+</body>
+</html>
