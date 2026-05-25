@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Prototype 3D V4 - Voxel Custom Mesh Streaming</title>
+    <style>
+        html, body { overflow: hidden; width: 100%; height: 100%; margin: 0; padding: 0; }
+        #renderCanvas { width: 100%; height: 100%; touch-action: none; }
+        #uiPanel { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.85); color: #00ffcc; padding: 15px; font-family: monospace; border-radius: 5px; border: 1px solid #00ffcc; pointer-events: none; z-index: 10; }
+/* Style pour le réticule de visée central */
+#crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    transform: translate(-50%, -50%);
+    pointer-events: none; /* Ne bloque pas les clics sur le jeu */
+    z-index: 20; /* Passe au-dessus du canvas */
+}
+
+/* Les deux barres de la croix */
+#crosshair::before, #crosshair::after {
+    content: '';
+    position: absolute;
+    background: #00ffcc; /* Même couleur cyan fluo que ton UI Panel */
+    box-shadow: 0 0 4px rgba(0, 255, 204, 0.7); /* Petit effet néon */
+}
+
+/* Barre horizontale */
+#crosshair::before {
+    top: 4px;
+    left: 0;
+    width: 10px;
+    height: 2px;
+}
+
+/* Barre verticale */
+#crosshair::after {
+    top: 0;
+    left: 4px;
+    width: 2px;
+    height: 10px;
+}
+    </style>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+</head>
+<body>
+    <div id="uiPanel">
+        <h3 style="margin-top:0;">🧱 MOTEUR VOXEL CUSTOM MESH V4</h3>
+        <div id="fpsCounter" style="color: #ff0055; font-weight: bold; margin-bottom: 5px;">FPS : --</div>
+        <div id="macroPos">Chunk Centre : Initialisation...</div>
+        <div id="microPos">Position Absolue : X=0, Y=0, Z=0</div>
+        <div id="worldBounds" style="color: #ffcc00; margin-top: 5px;">Limites Monde : Chargement...</div>
+    </div>
+    <div id="crosshair"></div> 
+   <canvas id="renderCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById("renderCanvas");
+        const engine = new BABYLON.Engine(canvas, true);
+        const API_URL = "http://127.0.0.1:8000/api/world";
+
+        // Dimensions fixes d'une colonne de chunk (doit correspondre au script Python)
+        const CHUNK_SIZE = 16;
+        const CHUNK_HEIGHT = 100;
+
+        let scene = null;
+        let camera = null;
+
+        let loadedChunks = {}; 
+        let currentCentreX = 5;
+        let currentCentreY = 5;
+        let isLambdaLoading = false;
+
+        let lastTrackedChunkX = 5;
+        let lastTrackedChunkZ = 5;
+
+        let worldMaxX = 10000;
+        let worldMaxZ = 10000;
+let altitudeVerrouillee = null; // 🟢 Stockera la hauteur idéale pour ne pas couler
+
+        // =========================================================================
+        // MOTEUR DE RENDU
+        // =========================================================================
+        engine.runRenderLoop(() => { 
+            if (scene && typeof scene.render === "function") {
+                scene.render(); 
+                
+                const fps = engine.getFps().toFixed(0);
+                const fpsElement = document.getElementById("fpsCounter");
+                if (fpsElement) {
+                    fpsElement.innerText = `FPS : ${fps}`;
+                }
+            }
+        });
+
+        // =========================================================================
+        // UTILITAIRES DE RECHERCHE DANS LE TABLEAU LINÉAIRE BINAIRE
+        // =========================================================================
+        function getVoxel(x, y, z, voxels) {
+            if (y < 0 || y >= CHUNK_HEIGHT) return 0; // AIR si hors limite verticale
+            if (x < 0 || x >= CHUNK_SIZE || z < 0 || z >= CHUNK_SIZE) return 0; // AIR pour forcer le dessin aux frontières (test coutures)
+            
+            // Indexation linéaire identique au format NumPy aplati (C-order)
+    let index = (x * CHUNK_HEIGHT * CHUNK_SIZE) + (y * CHUNK_SIZE) + z;
+    
+    return voxels[index];
+        }
+
+        // =========================================================================
+        // CONSTRUCTEUR DE FACES OPTIMISÉES (GÉNÉRATEUR VERTEXDATA)
+        // =========================================================================
+        function ajouterFace(X, Y, Z, direction, positions, indices, normals, currentVertexIndex) {
+            const s = [
+                [X,   Y,   Z],   // 0
+                [X+1, Y,   Z],   // 1
+                [X+1, Y+1, Z],   // 2
+                [X,   Y+1, Z],   // 3
+                [X,   Y,   Z+1], // 4
+                [X+1, Y,   Z+1], // 5
+                [X+1, Y+1, Z+1], // 6
+                [X,   Y+1, Z+1]  // 7
+            ];
+
+            let sommetsFace = [];
+            let normale = [0, 0, 0];
+
+            switch(direction) {
+                case 'HAUT':
+                    sommetsFace = [s[3], s[2], s[6], s[7]]; normale = [0, 1, 0]; break;
+                case 'BAS':
+                    sommetsFace = [s[4], s[5], s[1], s[0]]; normale = [0, -1, 0]; break;
+                case 'GAUCHE':
+                    sommetsFace = [s[4], s[0], s[3], s[7]]; normale = [-1, 0, 0]; break;
+                case 'DROITE':
+                    sommetsFace = [s[1], s[5], s[6], s[2]]; normale = [1, 0, 0]; break;
+                case 'AVANT':
+                    sommetsFace = [s[5], s[4], s[7], s[6]]; normale = [0, 0, 1]; break;
+                case 'ARRIERE':
+                    sommetsFace = [s[0], s[1], s[2], s[3]]; normale = [0, 0, -1]; break;
+            }
+
+            for (let i = 0; i < 4; i++) {
+                positions.push(...sommetsFace[i]);
+                normals.push(...normale);
+            }
+
+            indices.push(currentVertexIndex, currentVertexIndex + 1, currentVertexIndex + 2);
+            indices.push(currentVertexIndex, currentVertexIndex + 2, currentVertexIndex + 3);
+        }
+
+        // =========================================================================
+        // CONSTRUCTEUR DE LA SCÈNE 3D
+        // =========================================================================
+        const createScene = function () {
+            const s = new BABYLON.Scene(engine);
+
+s.gravity = new BABYLON.Vector3(0, -9.81, 0);
+            s.clearColor = new BABYLON.Color3(0.5, 0.7, 1.0); 
+s.collisionsEnabled = true;
+
+            // Configuration caméra UniversalCamera d'origine V3
+            camera = new BABYLON.UniversalCamera("playerCam", new BABYLON.Vector3(0, 40, 0), s);
+camera.inertia = 0;
+            camera.attachControl(canvas, true);
+camera.minZ = 0.01;            
+            camera.speed = 1;
+            camera.angularSensibility = 1000;
+            camera.keysUp.push(90); camera.keysDown.push(83);   // Z, S
+            camera.keysLeft.push(81); camera.keysRight.push(68); // Q, D
+
+
+            camera.checkCollisions = true;
+            camera.applyGravity = false;
+            camera.ellipsoid = new BABYLON.Vector3(0.3, 0.2, 0.3);
+camera.ellipsoidOffset = new BABYLON.Vector3(0, 0.8, 0); 
+           camera.upperBetaLimit = Math.PI / 2;
+            camera.lowerBetaLimit = -Math.PI / 2;
+
+            canvas.addEventListener("click", () => { canvas.requestPointerLock(); });
+
+            // Lumières d'origine V3 pour sculpter les ombres du relief
+            const sunLight = new BABYLON.DirectionalLight("sun", new BABYLON.Vector3(-1, -2, -1), s);
+            sunLight.position = new BABYLON.Vector3(0, 100, 0);
+            sunLight.intensity = 0.7;
+
+            const ambientLight = new BABYLON.HemisphericLight("ambient", new BABYLON.Vector3(0, 1, 0), s);
+            ambientLight.intensity = 0.3;
+
+            // Matériau de la terre verte d'origine
+            const terrainMat = new BABYLON.StandardMaterial("terrainMat", s);
+            terrainMat.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.3); 
+            terrainMat.specularColor = new BABYLON.Color3(0, 0, 0);       
+            terrainMat.backFaceCulling = true; // Optimisation : ne pas dessiner l'intérieur des cubes
+
+
+
+            // Algorithme de maillage et de consommation du BLOB Python
+            function genererMeshChunk(cx, cz, voxels) {
+                const key = `${cx}_${cz}`;
+                
+                let positions = [];
+                let indices = [];
+                let normals = [];
+                let currentVertexIndex = 0;
+
+                const worldXOffset = cx * CHUNK_SIZE;
+                const worldZOffset = cz * CHUNK_SIZE;
+
+                // Parcours intégral 3D du volume de la micro-carte
+                for(let x = 0; x < CHUNK_SIZE; x++) {
+                    for(let z = 0; z < CHUNK_SIZE; z++) {
+                        for(let y = 0; y < CHUNK_HEIGHT; y++) {
+                            
+                            let voxelActuel = getVoxel(x, y, z, voxels);
+                            if (voxelActuel === 0) continue; // C'est de l'air, on saute
+
+                            const worldX = worldXOffset + x;
+                            const worldZ = worldZOffset + z;
+
+                            // Vérification des 6 voisins : si c'est de l'air, on ajoute la face
+                            if (getVoxel(x, y + 1, z, voxels) === 0) {
+                                ajouterFace(worldX, y, worldZ, 'HAUT', positions, indices, normals, currentVertexIndex);
+                                currentVertexIndex += 4;
+                            }
+                            if (getVoxel(x, y - 1, z, voxels) === 0) {
+                                ajouterFace(worldX, y, worldZ, 'BAS', positions, indices, normals, currentVertexIndex);
+                                currentVertexIndex += 4;
+                            }
+                            if (getVoxel(x - 1, y, z, voxels) === 0) {
+                                ajouterFace(worldX, y, worldZ, 'GAUCHE', positions, indices, normals, currentVertexIndex);
+                                currentVertexIndex += 4;
+                            }
+                            if (getVoxel(x + 1, y, z, voxels) === 0) {
+                                ajouterFace(worldX, y, worldZ, 'DROITE', positions, indices, normals, currentVertexIndex);
+                                currentVertexIndex += 4;
+                            }
+                            if (getVoxel(x, y, z + 1, voxels) === 0) {
+                                ajouterFace(worldX, y, worldZ, 'AVANT', positions, indices, normals, currentVertexIndex);
+                                currentVertexIndex += 4;
+                            }
+                            if (getVoxel(x, y, z - 1, voxels) === 0) {
+                                ajouterFace(worldX, y, worldZ, 'ARRIERE', positions, indices, normals, currentVertexIndex);
+                                currentVertexIndex += 4;
+                            }
+                        }
+                    }
+                }
+
+                // S'il y a au moins une face visible à dessiner dans le chunk
+                if (positions.length > 0) {
+                    const chunkMesh = new BABYLON.Mesh(`chunk_${key}`, s);
+                    const vertexData = new BABYLON.VertexData();
+                    
+                    vertexData.positions = positions;
+                    vertexData.indices = indices;
+                    vertexData.normals = normals;
+                    
+                    vertexData.applyToMesh(chunkMesh);
+                    chunkMesh.material = terrainMat;
+                    chunkMesh.isPickable = true;
+                    
+                    chunkMesh.checkCollisions = true; 
+
+                    // Geler la matrice pour des performances optimales (la carte est fixe)
+                    chunkMesh.freezeWorldMatrix();
+                    
+                    loadedChunks[key].push(chunkMesh);
+                }
+            }
+
+            // GESTIONNAIRE DE STREAMING MIS À JOUR POUR LE BLOB BINAIRE V4
+            async function updateWorldStreaming(chunkCentreX, chunkCentreY) {
+                if (isLambdaLoading) return;
+                isLambdaLoading = true;
+
+                document.getElementById("macroPos").innerText = `⚡ NETTOYAGE & CHARGEMENT DES CUBES...`;
+
+                const targetChunks = [];
+                // Grille d'affichage autour du joueur (ici zone restreinte de test basée sur ta logique de voisinage)
+                for (let dx = -1; dx <= 1; dx++) {
+                    for (let dy = -1; dy <= 1; dy++) {
+                        const tx = chunkCentreX + dx;
+                        const ty = chunkCentreY + dy;
+                        targetChunks.push({ x: tx, y: ty });
+                    }
+                }
+
+                const requiredKeys = targetChunks.map(c => `${c.x}_${c.y}`);
+
+                // Nettoyage des anciens maillages
+                for (let key in loadedChunks) {
+                    if (!requiredKeys.includes(key)) {
+                        loadedChunks[key].forEach(mesh => mesh.dispose());
+                        delete loadedChunks[key];
+                    }
+                }
+
+                // Appel et traitement de ton API Python modifiée en V4
+                for (let chunk of targetChunks) {
+                    const key = `${chunk.x}_${chunk.y}`;
+                    if (loadedChunks[key]) continue; 
+
+                    loadedChunks[key] = [];
+
+                    try {
+                        const response = await fetch(`${API_URL}/chunk/${chunk.x}/${chunk.y}`);
+                        if (!response.ok) throw new Error("Erreur HTTP de l'API");
+                        
+                        const buffer = await response.arrayBuffer();
+                        const voxels = new Uint8Array(buffer); // Nos 16384 octets
+
+                        genererMeshChunk(chunk.x, chunk.y, voxels);
+                    } catch (err) {
+                        console.error(`Impossible de charger le chunk ${key}:`, err);
+                    }
+                }
+
+                currentCentreX = chunkCentreX;
+                currentCentreY = chunkCentreY;
+                document.getElementById("macroPos").innerText = `Chunk Centre : X=${currentCentreX}, Z=${currentCentreY}`;
+                isLambdaLoading = false;
+            }
+
+            // Premier déclenchement au démarrage
+            updateWorldStreaming(currentCentreX, currentCentreY);
+
+            // BOUCLE INTERNE À CHAQUE FRAME : Suivi de la position et de l'altitude
+s.registerBeforeRender(() => {
+    if (!camera) return;
+
+    let posX = camera.position.x;
+    let posZ = camera.position.z;
+
+    // 1. Convertir ta position absolue en coordonnées de Chunk (V4 = 16x16)
+    const chunkX = Math.floor(posX / CHUNK_SIZE);
+    const chunkZ = Math.floor(posZ / CHUNK_SIZE);
+    const chunkKey = `${chunkX}_${chunkZ}`;
+
+    // 2. Trouver les coordonnées locales du bloc (0 à 15) à l'intérieur de ce chunk
+    let localX = Math.floor(posX) % CHUNK_SIZE;
+    let localZ = Math.floor(posZ) % CHUNK_SIZE;
+    
+    // Sécurité pour les coordonnées négatives
+    if (localX < 0) localX += CHUNK_SIZE;
+    if (localZ < 0) localZ += CHUNK_SIZE;
+
+    // 3. Si le chunk est chargé et présent en mémoire, on cherche sa hauteur
+    if (loadedChunks[chunkKey]) {
+        let yReelSol = 0;
+        
+        // ATTENTION : Pour lire le tableau binaire, on a besoin de récupérer le buffer 
+        // stocké lors du fetch. Pour que ce script fonctionne, il faut s'assurer 
+        // que tu as stocké ton tableau 'voxels' quelque part. 
+        // Modifions légèrement la logique pour utiliser une approche universelle :
+        
+        // Pour ce test V4, on va chercher le Mesh de ton chunk et demander à Babylon 
+        // la hauteur du sol via le calcul de collision ou une estimation rapide.
+    }
+
+    // --- SOLUTION COMPATIBLE AVEC TON CODE BINAIRE ACTUEL ---
+    // Pour éviter de re-parcourir le binaire à chaque frame, on utilise le Raycast natif 
+    // de Babylon mais configuré sans physique rigide (le mode "Flottaison" de ta V3 !)
+    
+    const rayOrigin = new BABYLON.Vector3(posX, 100, posZ); // On tire un rayon depuis le ciel (100m)
+    const rayDirection = new BABYLON.Vector3(0, -1, 0); // Vers le bas
+    const ray = new BABYLON.Ray(rayOrigin, rayDirection, 150);
+    
+    // On cherche si le rayon touche un de tes morceaux de route/terrain V4
+    const pickInfo = s.pickWithRay(ray, (mesh) => mesh.name.startsWith("chunk_"));
+
+    if (pickInfo.hit && pickInfo.pickedPoint) {
+        // Le rayon a touché le sommet du cube le plus haut !
+        let hauteurCubeSurface = pickInfo.pickedPoint.y;
+        
+        // On force le Y de la caméra à glisser fluidement à 1.7m au-dessus de cette surface
+        // Le Lerp (0.2) adoucit la montée/descente quand tu passes d'un cube à un autre
+        camera.position.y = BABYLON.Scalar.Lerp(camera.position.y, hauteurCubeSurface + 1.7, 0.2);
+    }
+
+    // Récupération des positions finales pour l'affichage UI
+    let posY = camera.position.y;
+
+                document.getElementById("microPos").innerText = `Position Absolue : X=${posX.toFixed(1)}, Y=${posY.toFixed(1)}, Z=${posZ.toFixed(1)}`;
+
+                // Conversion de la position absolue en indices de chunk (1 bloc = 1 mètre, chunk = 16 mètres)
+                const playerChunkX = Math.floor(posX / CHUNK_SIZE);
+                const playerChunkZ = Math.floor(posZ / CHUNK_SIZE);
+
+                if ((playerChunkX !== lastTrackedChunkX || playerChunkZ !== lastTrackedChunkZ) && !isLambdaLoading) {
+                    lastTrackedChunkX = playerChunkX;
+                    lastTrackedChunkZ = playerChunkZ;
+                    updateWorldStreaming(playerChunkX, playerChunkZ);
+                }
+
+                // Blocage des limites physiques du monde
+                const limiteMin = 1.5;
+                const limiteMaxX = worldMaxX - 1.5;
+                const limiteMaxZ = worldMaxZ - 1.5;
+
+                if (camera.position.x < limiteMin)  { camera.position.x = limiteMin; }
+                if (camera.position.x > limiteMaxX) { camera.position.x = limiteMaxX; }
+                if (camera.position.z < limiteMin)  { camera.position.z = limiteMin; }
+                if (camera.position.z > limiteMaxZ) { camera.position.z = limiteMaxZ; }
+            });
+
+    s.executeWhenReady(() => {
+        s.getEngine().runRenderLoop(() => {});
+    });
+
+            return s;
+        };
+
+        // =========================================================================
+        // INITIALISATION ET SYNC CONFIGURATION SERVEUR
+        // =========================================================================
+async function initGame() {
+    try {
+        document.getElementById("macroPos").innerText = `⚙️ CONFIGURATION DE L'API...`;
+        
+        // 1. Récupérer les paramètres du monde
+        const response = await fetch(`${API_URL}/settings`);
+        const settings = await response.json();
+        
+        worldMaxX = settings.world_max_x_meters;
+        worldMaxZ = settings.world_max_z_meters;
+        
+        currentCentreX = Math.floor(settings.chunks_count_x / 2);
+        currentCentreY = Math.floor(settings.chunks_count_y / 2);
+        lastTrackedChunkX = currentCentreX;
+        lastTrackedChunkZ = currentCentreY;
+
+        document.getElementById("worldBounds").innerText = `Limites Monde : [0m - ${worldMaxX}m]`;
+        
+        // 2. Instancier la scène Babylon
+        scene = createScene(); 
+        
+        // 3. Calculer les coordonnées de départ au centre du monde
+        const departX = (currentCentreX * CHUNK_SIZE) + (CHUNK_SIZE / 2);
+        const departZ = (currentCentreY * CHUNK_SIZE) + (CHUNK_SIZE / 2);
+        
+        // 4. CHARGEMENT PRIORITAIRE DU CHUNK DE DÉMARRAGE
+        document.getElementById("macroPos").innerText = `⏳ CALCUL DU SOL DE DÉMARRAGE...`;
+        const chunkResponse = await fetch(`${API_URL}/chunk/${currentCentreX}/${currentCentreY}`);
+        const buffer = await chunkResponse.arrayBuffer();
+        const voxels = new Uint8Array(buffer);
+
+        // Trouver le cube de terre (ID 1 ou 2) le plus haut au centre exact de ce chunk
+        let localX = Math.floor(CHUNK_SIZE / 2);
+        let localZ = Math.floor(CHUNK_SIZE / 2);
+        let yReelSol = 0;
+
+        // On inspecte la colonne de bas en haut pour trouver le sommet de la terre
+        for (let y = CHUNK_HEIGHT - 1; y >= 0; y--) {
+            let voxel = voxels[localX + (y * CHUNK_SIZE) + (localZ * CHUNK_SIZE * CHUNK_HEIGHT)];
+            if (voxel > 0) { // On a trouvé un bloc solide (Terre/Herbe)
+                yReelSol = y + 1; // L'altitude est l'index du cube + 1
+                break;
+            }
+        }
+
+        // 5. POSITIONNEMENT PARFAIT DE LA CAMÉRA
+        if (camera) {
+            // On pose les yeux du joueur à 1.7m au-dessus du vrai cube de surface
+            let yYeux = yReelSol + 1.7; 
+            
+            camera.position = new BABYLON.Vector3(departX, yYeux, departZ);
+            camera.setTarget(new BABYLON.Vector3(departX, yYeux, departZ + 10));
+            
+            console.log(`Spawn réussi ! Sol détecté à Y=${yReelSol}, caméra placée à Y=${yYeux}`);
+        }
+        
+    } catch (error) {
+        document.getElementById("macroPos").innerText = `❌ ERREUR INITIALISATION SETTINGS`;
+        console.error("Détail du blocage :", error);
+    }
+}
+
+
+        window.addEventListener("DOMContentLoaded", initGame);
+        window.addEventListener("resize", () => { engine.resize(); });
+    </script>
+</body>
+</html>
