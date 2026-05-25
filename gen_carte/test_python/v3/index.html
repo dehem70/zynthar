@@ -45,6 +45,9 @@
             camera.setTarget(new BABYLON.Vector3(550, 15, 560));
             camera.attachControl(canvas, true);
             
+            // Limite le regard vertical pour éviter de se retourner le cou (en radians)
+            camera.upperBetaLimit = Math.PI / 2; // Impossible de regarder plus haut que le ciel vertical
+            camera.lowerBetaLimit = -Math.PI / 2; // Impossible de regarder plus bas que ses pieds
             camera.speed = 1.8;
             camera.angularSensibility = 2000;
             camera.keysUp.push(90); camera.keysDown.push(83); // Z, S
@@ -134,7 +137,6 @@ terrainMat.wireframe = true; // Force l'affichage de la cage géométrique
             // BOUCLE DE RENDU ET FIXATION MATHÉMATIQUE DU SOL
 // BOUCLE DE RENDU ET FIXATION DU RELIEF
 scene.registerBeforeRender(() => {
-    camera.rotation.x = 0; 
 
     // 1. On récupère la position demandée par les touches du joueur
     let posX = camera.position.x;
