@@ -77,6 +77,20 @@ def get_chunk_v4(cx: int, cz: int):
                 voxels[x, :hauteur_max + 1, z] = 1
 
     # 4. On aplatit le tableau en continu et on l'envoie en binaire brut
+    ALTITUDE_TUNNEL = 1
+    HAUTEUR_TUNNEL = 3
+    LARGEUR_TUNNEL = 2
+    
+    # Pour que le tunnel soit continu entre les chunks, on le creuse sur tout l'axe X (0 à 15)
+    for x in range(CHUNK_SIZE):
+        for y in range(ALTITUDE_TUNNEL, ALTITUDE_TUNNEL + HAUTEUR_TUNNEL):
+            # On centre le tunnel au milieu de l'axe Z du chunk (Z entre 6 et 9)
+            for z in range(6, 6 + LARGEUR_TUNNEL):
+                # On force la valeur à 0 (AIR) pour évider la montagne
+                voxels[x, y, z] = 0
+
+
+
     return Response(content=voxels.tobytes(), media_type="application/octet-stream")
 
 @app.get("/api/world/dimensions")

@@ -327,63 +327,38 @@ camera.ellipsoidOffset = new BABYLON.Vector3(0, 0.8, 0);
             updateWorldStreaming(currentCentreX, currentCentreY);
 
             // BOUCLE INTERNE À CHAQUE FRAME : Suivi de la position et de l'altitude
+// =========================================================================
+// BOUCLE DE RENDU ET SUIVI DU RELIEF (CORRIGÉE)
+// =========================================================================
 s.registerBeforeRender(() => {
     if (!camera) return;
 
+    // 1. 🟢 ON DÉCLARE LES TROIS AXES EN PREMIER, SANS EXCEPTION
     let posX = camera.position.x;
+    let posY = camera.position.y; // Déclarée et initialisée immédiatement ici !
     let posZ = camera.position.z;
 
-    // 1. Convertir ta position absolue en coordonnées de Chunk (V4 = 16x16)
-    const chunkX = Math.floor(posX / CHUNK_SIZE);
-    const chunkZ = Math.floor(posZ / CHUNK_SIZE);
-    const chunkKey = `${chunkX}_${chunkZ}`;
+    // 2. Le Raycast local utilise maintenant un posY parfaitement initialisé
+    const rayOrigin = new BABYLON.Vector3(posX, posY, posZ); 
+    const rayDirection = new BABYLON.Vector3(0, -1, 0); 
+    const ray = new BABYLON.Ray(rayOrigin, rayDirection, 5); 
 
-    // 2. Trouver les coordonnées locales du bloc (0 à 15) à l'intérieur de ce chunk
-    let localX = Math.floor(posX) % CHUNK_SIZE;
-    let localZ = Math.floor(posZ) % CHUNK_SIZE;
-    
-    // Sécurité pour les coordonnées négatives
-    if (localX < 0) localX += CHUNK_SIZE;
-    if (localZ < 0) localZ += CHUNK_SIZE;
-
-    // 3. Si le chunk est chargé et présent en mémoire, on cherche sa hauteur
-    if (loadedChunks[chunkKey]) {
-        let yReelSol = 0;
-        
-        // ATTENTION : Pour lire le tableau binaire, on a besoin de récupérer le buffer 
-        // stocké lors du fetch. Pour que ce script fonctionne, il faut s'assurer 
-        // que tu as stocké ton tableau 'voxels' quelque part. 
-        // Modifions légèrement la logique pour utiliser une approche universelle :
-        
-        // Pour ce test V4, on va chercher le Mesh de ton chunk et demander à Babylon 
-        // la hauteur du sol via le calcul de collision ou une estimation rapide.
-    }
-
-    // --- SOLUTION COMPATIBLE AVEC TON CODE BINAIRE ACTUEL ---
-    // Pour éviter de re-parcourir le binaire à chaque frame, on utilise le Raycast natif 
-    // de Babylon mais configuré sans physique rigide (le mode "Flottaison" de ta V3 !)
-    
-    const rayOrigin = new BABYLON.Vector3(posX, 100, posZ); // On tire un rayon depuis le ciel (100m)
-    const rayDirection = new BABYLON.Vector3(0, -1, 0); // Vers le bas
-    const ray = new BABYLON.Ray(rayOrigin, rayDirection, 150);
-    
-    // On cherche si le rayon touche un de tes morceaux de route/terrain V4
     const pickInfo = s.pickWithRay(ray, (mesh) => mesh.name.startsWith("chunk_"));
 
     if (pickInfo.hit && pickInfo.pickedPoint) {
-        // Le rayon a touché le sommet du cube le plus haut !
         let hauteurCubeSurface = pickInfo.pickedPoint.y;
         
-        // On force le Y de la caméra à glisser fluidement à 1.7m au-dessus de cette surface
-        // Le Lerp (0.2) adoucit la montée/descente quand tu passes d'un cube à un autre
+        // On met à jour la position de la caméra
         camera.position.y = BABYLON.Scalar.Lerp(camera.position.y, hauteurCubeSurface + 1.7, 0.2);
+        
+        // 🟢 ON RE-MET À JOUR NOTRE VARIABLE LOCALE POUR L'AFFICHAGE UI EN DESSOUS
+        posY = camera.position.y;
     }
 
-    // Récupération des positions finales pour l'affichage UI
-    let posY = camera.position.y;
+    // 3. Mise à jour de l'affichage HTML (plus aucun risque de plantage)
+    document.getElementById("microPos").innerText = `Position Absolue : X=${posX.toFixed(1)}, Y=${posY.toFixed(1)}, Z=${posZ.toFixed(1)}`;
 
-                document.getElementById("microPos").innerText = `Position Absolue : X=${posX.toFixed(1)}, Y=${posY.toFixed(1)}, Z=${posZ.toFixed(1)}`;
-
+    // ... Reste du code inchangé (chargement des chunks, limites du monde, etc.)
                 // Conversion de la position absolue en indices de chunk (1 bloc = 1 mètre, chunk = 16 mètres)
                 const playerChunkX = Math.floor(posX / CHUNK_SIZE);
                 const playerChunkZ = Math.floor(posZ / CHUNK_SIZE);
