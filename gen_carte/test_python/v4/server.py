@@ -47,7 +47,7 @@ def get_world_settings():
 
 
 @app.get("/api/world/chunk/{cx}/{cz}")
-def get_chunk_v4(cx: int, cz: int):
+async def get_chunk_v4(cx: int, cz: int):
     # 2. On crée un tableau 3D NumPy vide (0 = AIR)
     # Format de coordonnées locales : [X, Y, Z]
     voxels = np.zeros((CHUNK_SIZE, CHUNK_HEIGHT, CHUNK_SIZE), dtype=np.uint8)

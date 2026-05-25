@@ -43,7 +43,8 @@
     height: 10px;
 }
     </style>
-    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/materialsLibrary/babylon.skyMaterial.js"></script>
 </head>
 <body>
     <div id="uiPanel">
@@ -154,11 +155,53 @@ let altitudeVerrouillee = null; // 🟢 Stockera la hauteur idéale pour ne pas 
         // CONSTRUCTEUR DE LA SCÈNE 3D
         // =========================================================================
         const createScene = function () {
-            const s = new BABYLON.Scene(engine);
+const s = new BABYLON.Scene(engine);
+
+// 1. Création du Dôme Céleste (Une sphère géante inversée)
+const skybox = BABYLON.MeshBuilder.CreateBox("skyBox", { size: 1000.0 }, s);
+const skyMaterial = new BABYLON.SkyMaterial("skyMaterial", s);
+skyMaterial.backFaceCulling = true;
+skyMaterial.applyFog = false; 
+skybox.material = skyMaterial;
+skybox.renderingGroupId = 0;
+
+// 2. Configuration de l'atmosphère (Réaliste)
+skyMaterial.turbidity = 5; // Quantité de poussière (5 = ciel de campagne réaliste)
+skyMaterial.luminance = 1.2;
+skyMaterial.inclination = 0.2; // Position du soleil (0.5 = midi, 0 = crépuscule)
+skyMaterial.azimuth = 0.25;     // Orientation du soleil (Est/Ouest)
+
+// 3. 🟢 ON CRÉE LA LUMIÈRE DU SOLEIL DIRECTEMENT ICI (Avec le "const")
+const sunPosition = skyMaterial.sunPosition;
+const sunLight = new BABYLON.DirectionalLight(
+    "sunLight", 
+    new BABYLON.Vector3(-sunPosition.x, -sunPosition.y, -sunPosition.z), 
+    s
+);
+sunLight.intensity = 0.8;
+
+// 4. AJUSTEMENT DU BROUILLARD V4
+// Pour que le brouillard se fonde de manière réaliste, sa couleur doit maintenant
+// copier la couleur de l'horizon de ton nouveau ciel au lieu d'un bleu fixe.
+s.fogMode = BABYLON.Scene.FOGMODE_LINEAR;
+s.fogColor = new BABYLON.Color3(0.65, 0.78, 0.88); // Teinte moyenne de l'horizon du SkyMaterial
+s.fogStart = 20.0;
+s.fogEnd = 60.0;
+
+
 
 s.gravity = new BABYLON.Vector3(0, -9.81, 0);
             s.clearColor = new BABYLON.Color3(0.5, 0.7, 1.0); 
 s.collisionsEnabled = true;
+
+s.onBeforeRenderingGroupObservable.add((groupInfo) => {
+    if (groupInfo.renderingGroupId === 0) {
+        s.fogEnabled = false; // On éteint le brouillard quand on dessine le ciel
+    } else {
+        s.fogEnabled = true;  // On le rallume pour les chunks (groupe 1)
+    }
+});
+
 
             // Configuration caméra UniversalCamera d'origine V3
             camera = new BABYLON.UniversalCamera("playerCam", new BABYLON.Vector3(0, 40, 0), s);
@@ -180,18 +223,16 @@ camera.ellipsoidOffset = new BABYLON.Vector3(0, 0.8, 0);
 
             canvas.addEventListener("click", () => { canvas.requestPointerLock(); });
 
-            // Lumières d'origine V3 pour sculpter les ombres du relief
-            const sunLight = new BABYLON.DirectionalLight("sun", new BABYLON.Vector3(-1, -2, -1), s);
-            sunLight.position = new BABYLON.Vector3(0, 100, 0);
-            sunLight.intensity = 0.7;
-
-            const ambientLight = new BABYLON.HemisphericLight("ambient", new BABYLON.Vector3(0, 1, 0), s);
-            ambientLight.intensity = 0.3;
 
             // Matériau de la terre verte d'origine
             const terrainMat = new BABYLON.StandardMaterial("terrainMat", s);
-            terrainMat.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.3); 
-            terrainMat.specularColor = new BABYLON.Color3(0, 0, 0);       
+            terrainMat.diffuseColor = new BABYLON.Color3(0.3, 0.6, 0.3); 
+            terrainMat.specularColor = new BABYLON.Color3(0, 0, 0);
+terrainMat.specularPower = 0;
+
+// 3. 🟢 CONFIGURER LA COULEUR AMBIANTE POUR CORRESPONDRE AU BROUILLARD
+// Cela permet aux faces à l'ombre de prendre la teinte de l'atmosphère
+terrainMat.ambientColor = new BABYLON.Color3(0.2, 0.2, 0.2);       
             terrainMat.backFaceCulling = true; // Optimisation : ne pas dessiner l'intérieur des cubes
 
 
@@ -265,7 +306,7 @@ camera.ellipsoidOffset = new BABYLON.Vector3(0, 0.8, 0);
 
                     // Geler la matrice pour des performances optimales (la carte est fixe)
                     chunkMesh.freezeWorldMatrix();
-                    
+  chunkMesh.renderingGroupId = 1;                  
                     loadedChunks[key].push(chunkMesh);
                 }
             }
@@ -279,8 +320,8 @@ camera.ellipsoidOffset = new BABYLON.Vector3(0, 0.8, 0);
 
                 const targetChunks = [];
                 // Grille d'affichage autour du joueur (ici zone restreinte de test basée sur ta logique de voisinage)
-                for (let dx = -1; dx <= 1; dx++) {
-                    for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -2; dx <= 2; dx++) {
+                    for (let dy = -2; dy <= 2; dy++) {
                         const tx = chunkCentreX + dx;
                         const ty = chunkCentreY + dy;
                         targetChunks.push({ x: tx, y: ty });
