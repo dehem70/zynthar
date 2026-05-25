@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Prototype 3D - Streaming Heightmap PNG</title>
+    <style>
+        html, body { overflow: hidden; width: 100%; height: 100%; margin: 0; padding: 0; }
+        #renderCanvas { width: 100%; height: 100%; touch-action: none; }
+        #uiPanel { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.85); color: #00ffcc; padding: 15px; font-family: monospace; border-radius: 5px; border: 1px solid #00ffcc; pointer-events: none; z-index: 10; }
+    </style>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+</head>
+<body>
+    <div id="uiPanel">
+        <h3 style="margin-top:0;">🗺️ MOTEUR DE STREAMING PNG NATIF</h3>
+        <div id="macroPos">Chunk Centre : Initialisation...</div>
+        <div id="microPos">Position Absolue : X=550.0, Z=550.0</div>
+        <div id="worldBounds" style="color: #ffcc00; margin-top: 5px;">Limites Monde : [0m - 10000m]</div>
+    </div>
+    <canvas id="renderCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById("renderCanvas");
+        const engine = new BABYLON.Engine(canvas, true);
+        const API_URL = "http://127.0.0.1:8000/api/world";
+
+        let loadedChunks = {}; 
+        let currentCentreX = 5;
+        let currentCentreY = 5;
+        let isLambdaLoading = false;
+
+        let lastTrackedChunkX = 5;
+        let lastTrackedChunkY = 5;
+
+        let worldMinX = 0, worldMaxX = 10000;
+        let worldMinZ = 0, worldMaxZ = 10000;
+
+        const createScene = function () {
+            const scene = new BABYLON.Scene(engine);
+            scene.clearColor = new BABYLON.Color3(0.5, 0.7, 1.0); 
+
+            // 1. CONFIGURATION DE LA CAMÉRA (Mode flottaison fluide)
+            // On désactive la gravité et les collisions natives sur la caméra pour supprimer le tremblement
+            const camera = new BABYLON.UniversalCamera("playerCam", new BABYLON.Vector3(0, 50, 0), scene);
+            camera.setTarget(new BABYLON.Vector3(550, 15, 560));
+            camera.attachControl(canvas, true);
+            
+            camera.speed = 1.8;
+            camera.angularSensibility = 2000;
+            camera.keysUp.push(90); camera.keysDown.push(83); // Z, S
+            camera.keysLeft.push(81); camera.keysRight.push(68); // Q, D
+
+            // On désactive le corps physique collisionnable de la caméra qui butait dans les polygones
+            camera.checkCollisions = false;
+            camera.applyGravity = false;
+
+            canvas.addEventListener("click", () => { canvas.requestPointerLock(); });
+
+            const light = new BABYLON.HemisphericLight("ambient", new BABYLON.Vector3(0, 1, 0), scene);
+            light.intensity = 0.8;
+
+            const terrainMat = new BABYLON.StandardMaterial("terrainMat", scene);
+
+terrainMat.wireframe = true; // Force l'affichage de la cage géométrique
+
+            terrainMat.diffuseColor = new BABYLON.Color3(0.3, 0.7, 0.3); 
+            terrainMat.specularColor = new BABYLON.Color3(0, 0, 0);       
+            terrainMat.backFaceCulling = false;
+
+            // MOTEUR DE STREAMING ASYNCHRONE
+            async function updateWorldStreaming(chunkCentreX, chunkCentreY) {
+                if (isLambdaLoading) return;
+                isLambdaLoading = true;
+
+                document.getElementById("macroPos").innerText = `⚡ STREAMING DES SECTEURS...`;
+
+                const targetChunks = [];
+                for (let dx = -1; dx <= 1; dx++) {
+                    for (let dy = -1; dy <= 1; dy++) {
+                        const tx = chunkCentreX + dx;
+                        const ty = chunkCentreY + dy;
+                        if (tx >= worldMinX/100 && tx < worldMaxX/100 && ty >= worldMinZ/100 && ty < worldMaxZ/100) {
+                            targetChunks.push({ x: tx, y: ty });
+                        }
+                    }
+                }
+
+                const requiredKeys = targetChunks.map(c => `${c.x}_${c.y}`);
+
+                for (let key in loadedChunks) {
+                    if (!requiredKeys.includes(key)) {
+                        loadedChunks[key].forEach(mesh => mesh.dispose());
+                        delete loadedChunks[key];
+                    }
+                }
+
+                targetChunks.forEach(chunk => {
+                    const key = `${chunk.x}_${chunk.y}`;
+                    if (loadedChunks[key]) return; 
+
+                    loadedChunks[key] = [];
+
+                    const offsetX = chunk.x * 100;
+                    const offsetZ = chunk.y * 100;
+                    const heightmapUrl = `${API_URL}/chunk/${chunk.x}/${chunk.y}/heightmap.png`;
+
+                    const ground = BABYLON.MeshBuilder.CreateGroundFromHeightMap(`ground_${key}`, heightmapUrl, {
+                        width: 100,
+                        height: 100,
+                        subdivisions: 100, // Équilibre parfait entre performance et lissage visuel
+                        minHeight: 0,
+                        maxHeight: 200,      
+                        onReady: function (mesh) {
+                            mesh.position.set(offsetX + 50, 0, offsetZ + 50); 
+                            mesh.material = terrainMat;
+                            
+                            // Important pour que le pointeur mathématique détecte le sol
+                            mesh.isPickable = true;
+                            mesh.createNormals(true);
+                            
+                            loadedChunks[key].push(mesh);
+                        }
+                    }, scene);
+                });
+
+                currentCentreX = chunkCentreX;
+                currentCentreY = chunkCentreY;
+                document.getElementById("macroPos").innerText = `Chunk Centre : X=${currentCentreX}, Y=${currentCentreY}`;
+                isLambdaLoading = false;
+            }
+
+            updateWorldStreaming(currentCentreX, currentCentreY);
+
+            // BOUCLE DE RENDU ET FIXATION MATHÉMATIQUE DU SOL
+// BOUCLE DE RENDU ET FIXATION DU RELIEF
+scene.registerBeforeRender(() => {
+    camera.rotation.x = 0; 
+
+    // 1. On récupère la position demandée par les touches du joueur
+    let posX = camera.position.x;
+    let posZ = camera.position.z;
+
+    document.getElementById("microPos").innerText = `Position Absolue : X=${posX.toFixed(1)}, Z=${posZ.toFixed(1)}`;
+
+    // 2. Gestion du streaming de la couronne (Inchangé)
+    const playerChunkX = Math.floor(posX / 100);
+    const playerChunkY = Math.floor(posZ / 100);
+
+    if ((playerChunkX !== lastTrackedChunkX || playerChunkY !== lastTrackedChunkY) && !isLambdaLoading) {
+        lastTrackedChunkX = playerChunkX;
+        lastTrackedChunkY = playerChunkY;
+        updateWorldStreaming(playerChunkX, playerChunkY);
+    }
+
+    // 3. Calcul de la flottaison sur le relief (On le fait AVANT le verrouillage des murs)
+    const rayOrigin = new BABYLON.Vector3(posX, 200, posZ);
+    const rayDirection = new BABYLON.Vector3(0, -1, 0);
+    const ray = new BABYLON.Ray(rayOrigin, rayDirection, 300);
+    const pickInfo = scene.pickWithRay(ray, (mesh) => mesh.name.startsWith("ground_"));
+
+    if (pickInfo.hit && pickInfo.pickedPoint) {
+        camera.position.y = BABYLON.Scalar.Lerp(camera.position.y, pickInfo.pickedPoint.y + 2.5, 0.3);
+    }
+
+    // =========================================================================
+    // 🧱 LE VERROU ULTIME : NETTOYAGE ET SÉCURITÉ AUX BORDURES (TOUT EN BAS !)
+    // =========================================================================
+    // Maintenant que la hauteur est calculée, on applique le filtre de position strict
+    const limiteMin = 1.5;
+    const limiteMaxX = worldMaxX - 1.5; // Utilise la variable dynamique reçue de l'API (2000 - 1.5)
+    const limiteMaxZ = worldMaxZ - 1.5; // Utilise la variable dynamique reçue de l'API (2000 - 1.5)
+
+    let aToucheLeMur = false;
+
+    if (camera.position.x < limiteMin)  { camera.position.x = limiteMin;  aToucheLeMur = true; }
+    if (camera.position.x > limiteMaxX) { camera.position.x = limiteMaxX; aToucheLeMur = true; }
+    if (camera.position.z < limiteMin)  { camera.position.z = limiteMin;  aToucheLeMur = true; }
+    if (camera.position.z > limiteMaxZ) { camera.position.z = limiteMaxZ; aToucheLeMur = true; }
+
+    // Optionnel : si le joueur fonce dans le mur, on coupe sa vélocité physique interne
+    if (aToucheLeMur && camera._collider && camera._collider.velocity) {
+        camera._collider.velocity.set(0, 0, 0);
+    }
+});
+            return scene;
+        };
+// FONCTION DE DÉMARRAGE ASYNCHRONE SÉCURISÉE
+async function initGame() {
+    try {
+        document.getElementById("macroPos").innerText = `⚙️ CONFIGURATION DE L'API...`;
+        
+        // 1. Appel et conversion du JSON (Validé par ton code 200)
+        const response = await fetch(`${API_URL}/settings`);
+        const settings = await response.json();
+        
+        // 2. Assignation des limites globales
+        worldMaxX = settings.world_max_x_meters;
+        worldMaxZ = settings.world_max_z_meters;
+        
+        currentCentreX = Math.floor(settings.chunks_count_x / 2);
+        currentCentreY = Math.floor(settings.chunks_count_y / 2);
+        lastTrackedChunkX = currentCentreX;
+        lastTrackedChunkY = currentCentreY;
+
+        // Mise à jour visuelle de l'UI
+        document.getElementById("worldBounds").innerText = `Limites Monde : [0m - ${worldMaxX}m]`;
+        
+        // 3. Création de la scène Babylon.js
+        const sceneActive = createScene();
+        
+        // 4. RECALAGE DE LA CAMÉRA SÉCURISÉ VIA L'ACTIVE CAMERA
+        // Au lieu de manipuler une variable 'camera' locale, on utilise l'instance de la scène
+        if (sceneActive.activeCamera) {
+            const departX = (currentCentreX * 100) + 50;
+            const departZ = (currentCentreY * 100) + 50;
+            
+            // On positionne le joueur au centre exact de la carte, à 50m de haut
+            sceneActive.activeCamera.position = new BABYLON.Vector3(departX, 50, departZ);
+            sceneActive.activeCamera.setTarget(new BABYLON.Vector3(departX, 50, departZ + 10));
+        }
+
+        // 5. Lancement de la boucle de rendu principale
+        engine.runRenderLoop(() => { 
+            sceneActive.render(); 
+        });
+        
+    } catch (error) {
+        document.getElementById("macroPos").innerText = `❌ ERREUR CONFIGURATION SETTINGS`;
+        // Ce log va t'afficher la ligne exacte et le nom du composant qui a bloqué !
+        console.error("Détail précis du blocage JavaScript :", error);
+    }
+}
+// Lancement automatique au chargement de la page
+window.addEventListener("DOMContentLoaded", initGame);
+window.addEventListener("resize", () => { engine.resize(); });
+
+    </script>
+</body>
+</html>
