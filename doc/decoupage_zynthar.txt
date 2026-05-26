@@ -1,0 +1,102 @@
+🚧 Brique 1 : Le Serveur Central (C Pur)
+
+C'est le cœur du jeu, le "chef d'orchestre" qui détient la vérité absolue sur l'état du monde.
+
+La Boucle Principale (Tickrate) : Implémentation d'une boucle à fréquence fixe (ex: 20 Hz / 50 ms par tick) gérant la physique et la logique.
+
+Le Gestionnaire de Concurrence : Une file d'attente (Message Queue) pour traiter les actions des joueurs une par une (premier arrivé, premier servi) et éviter les 
+conflits sur un même voxel.
+
+Le Système de Collision / Mouvement : Intégration de la logique de déplacement liée à vos règles métiers (gestion des obstacles de 40 cm, 1 m, 1.6 m et de la distance
+minimale de 1 m entre joueurs).
+
+🗄️ Brique 2 : Le Moteur de Persistance (C + SQLite3)
+
+La brique responsable de charger le monde et de sauvegarder les actions sans bloquer le serveur.
+
+Couche d'abstraction SQLite : Code en C pour interroger la base des 2 millions de macro-chunks de manière asynchrone (ou ultra-rapide via l'index composite).
+
+Générateur Procédural Déterministe (Algorithmes de bruit C + Logique de peuplement des biomes).
+
+Gestionnaire de Delta (Micro-chunks) : Système qui enregistre uniquement les blocs posés ou détruits par les joueurs dans une table secondaire pour ne pas alourdir
+la génération de base.
+
+🌐 Brique 3 : La Couche Réseau Hybride (C côté Serveur / JS côté Client)
+
+La plomberie fine pour garantir un transfert de données parfait sans latence perçue.
+
+Moteur d'AoI (Area of Interest) : Algorithme calculant dynamiquement la "bulle" de chaque joueur pour ne lui envoyer que les chunks visibles dans son rayon.
+
+Pipeline de Sérialisation (FlatBuffers / RLE) : Code de compression en C pour empaqueter les voxels au format binaire brut et décompression en JavaScript côté client.
+
+Gestionnaire de Protocoles : Routage des données (WebSockets pour les actions critiques comme la modification de blocs / WebRTC ou WebTransport pour les positions X,Y,Z 
+fluides des joueurs).
+
+🎮 Brique 4 : Le Client 3D (TypeScript / Babylon.js / WebGPU)
+
+Le moteur graphique qui s'exécute dans le navigateur de l'utilisateur, optimisé pour les Chromebooks via PWA.
+
+Système de Voxel Streaming : Logique qui demande, reçoit les paquets binaires du serveur en tâche de fond et assemble les maillages 3D (Meshing).
+
+Rendu WebGPU : Pipeline d'affichage ultra-performant tirant parti de la carte graphique pour afficher de grands volumes de voxels sans ramer.
+
+Contrôles Première Personne & Interaction : Gestion de la caméra, de la physique locale (pré-calcul des collisions) et tracé de rayon (Raycasting) pour matérialiser la 
+sphère d'interaction (ex: portée de 3 mètres pour modifier un bloc).
+
+🛠️ Brique 5 : Les Outils de Génération Procedurale (Pipeline "Offline")
+
+La brique qui permet d'initialiser votre univers.
+
+Le Générateur de Squelette (Python ou C) : Le script (similaire à celui que nous avons testé) utilisant des algorithmes de bruit (Perlin/Simplex) pour pré-calculer et 
+remplir la base SQLite des 2 millions de macro-chunks avec les biomes, températures et humidités.
+
+
+🪙 Brique 6 : Écosystème Web3 & Économie en jeu
+
+Cette brique gère la confiance, la propriété des actifs (items, parcelles de terrain) et la passerelle financière (entrées/sorties de fonds).
+
+1. La Couche Smart Contracts (MultiversX / Massa)
+C'est le code immuable qui vit sur la blockchain.
+
+Le Contrat de Clôture/Enregistrement (Ex: "gain") : Gestion des frais d'inscription ou des pools de récompenses en EGLD.
+
+Gestion des Actifs (SFT/NFT) : Utilisation des standards natifs de MultiversX (ESDT) pour représenter les objets rares ou les parcelles de terrain du monde de Zynthar 
+sans surcoût en "gas".
+
+Interopérabilité Cross-Chain : Logique de pont (Bridge) si vous décidez d'ouvrir l'économie vers l'écosystème Massa pour des contrats autonomes.
+
+2. Le Relais Serveur-Blockchain (Oracle Interne en C)
+Le serveur de jeu ne peut pas attendre qu'un bloc blockchain soit validé (6 secondes sur MultiversX) pour laisser un joueur jouer. Il faut un composant intermédiaire.
+
+L'Écouteur d'Événements (Event Listener) : Un sous-module (souvent un petit démon en Go/Python ou intégré en C) qui surveille la blockchain. Dès qu'un joueur achète un item 
+ou dépose des EGLD sur le contrat "gain", ce module prévient le serveur en C pour mettre à jour l'inventaire du joueur en mémoire vive.
+
+Le Validateur de Possession : Avant de charger certaines données ou d'accorder des droits de modification de micro-chunks spécifiques (ex: une zone protégée), le serveur
+vérifie la signature Web3 du joueur.
+
+3. L'Intégration Client (Le Portefeuille Web3)
+L'interface utilisateur dans votre application Babylon.js / PWA.
+
+Authentification (Login Web3) : Connexion via xPortal (QR Code), MultiversX DeFi Wallet ou Ledger. L'adresse du portefeuille devient l'identifiant unique du joueur dans votre
+ base SQLite.
+
+Signature des Transactions : Interface fluide pour permettre au joueur de signer une action économique sans quitter l'environnement du jeu.
+
+
+
+                        ┌────────────────────────────────┐
+                        │      6. ECOSYSTÈME WEB3        │
+                        │  (Contrats MultiversX, xPortal)│
+                        └───────────────┬────────────────┘
+                                        │ (Vérification / Transactions)
+                                        ▼
+┌────────────────────────┐    ┌────────────────────┐    ┌─────────────────────────┐
+│     4. CLIENT 3D       │    │  3. COUCHE RÉSEAU  │    │   1. SERVEUR CENTRAL    │
+│ (Babylon.js / WebGPU)  │◄──►│  (FlatBuffers/RLE) │◄──►│         (C Pur)         │
+└────────────────────────┘    └────────────────────┘    └───────────┬─────────────┘
+                                                                    │
+                                                                    ▼
+┌────────────────────────┐                      ┌───────────────────┴─────────────┐
+│ 5. OUTILS DE GÉNÉRATION│                      │     2. MOTEUR DE PERSISTANCE    │
+│  (Bruit Déterministe)  │                      │ (SQLite3: Macro/Micro + Deltas) │
+└────────────────────────┘                      └─────────────────────────────────┘
