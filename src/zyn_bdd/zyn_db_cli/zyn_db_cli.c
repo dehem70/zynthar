@@ -11,7 +11,7 @@
 //     cmd     : initw => initialisation de la base de données zyn_world.db                             //
 //               add-macro <x> <y> <biome> <temp> <hum> <elev> => Ajoute ou met à jour un macro-chunk   //
 //                                                                                                      //
-// nota : les chemins sont consiédés avec le préfixe enregistré dans la variable d'environnement        //
+// nota : les chemins sont considérés avec le préfixe enregistré dans la variable d'environnement       //
 //        ZYNTHAR_DB_DIR                                                                                //
 //                                                                                                      //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
