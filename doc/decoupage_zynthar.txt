@@ -82,7 +82,31 @@ Authentification (Login Web3) : Connexion via xPortal (QR Code), MultiversX DeFi
 
 Signature des Transactions : Interface fluide pour permettre au joueur de signer une action économique sans quitter l'environnement du jeu.
 
+🛠️ Brique 7 : Outillage, Maintenance & Tests
+Cette brique regroupe tous les programmes "hors-jeu" qui servent à valider, réparer, surveiller et faire évoluer le monde de Zynthar.
 
+1. Les Utilitaires de Maintenance des Bases de Données (SQLite3)
+L'Inspecteur / Extracteur de Chunk : Un outil en ligne de commande pour extraire les données d'un macro ou micro-chunk spécifique via ses coordonnées (X,Y) et les exporter en
+ format texte (JSON ou CSV) pour vérifier que les valeurs de température, humidité ou élévation maximale sont cohérentes.
+
+Le Nettoyeur de Deltas (Garbage Collector de blocs) : Si deux joueurs s'amusent à poser puis détruire 10 000 fois le même bloc, votre table de modifications va grossir inutilement.
+ Cet utilitaire analyse la table des deltas pour supprimer les actions redondantes (ex: annulations successives) et exécuter un VACUUM sur SQLite pour réduire et optimiser la
+ taille du fichier sur le disque.
+
+L'outil de Migration de Schéma : Si vous décidez d'ajouter une variable dans votre cadrage théorique (ex: ajouter la variable "pression atmosphérique" ou "vitesse du vent"
+ sur les macro-chunks), cet outil permet de mettre à jour la base des 2 millions de lignes sans perdre les données existantes.
+
+2. La Suite de Validation Algorithmique (Tests "Non-Régression")
+Le Validateur de Déterminisme Cross-Language : C'est un script crucial. Il génère 10 000 chunks aléatoires avec votre code de bruit en C (serveur) et fait de même avec votre code
+ TypeScript (client Babylon.js). Il compare ensuite les deux résultats au bit près pour s'assurer qu'il n'y a aucun écart de génération entre le serveur et le client (ce qui
+ provoquerait des joueurs qui lévitent ou s'enfoncent dans le sol).
+
+Le Générateur de Profil de Monde (Visualiseur 2D rapide) : Un script Python qui lit la base des 2 millions de macro-chunks et génère une image PNG géante (une carte thermique)
+ du monde complet de 1000×500 km pour vérifier visuellement la bonne distribution des biomes, des continents et des zones climatiques.
+
+3. Les Outils de Simulation Réseau et Charge (Stress Testing)
+Le Simulateur de "Bots" (Joueurs Fantômes) : Un programme capable de simuler la connexion de 100 joueurs virtuels qui se déplacent de manière aléatoire et modifient des blocs en boucle. C'est l'outil qui validera que votre boucle principale en C tient ses 20 ticks par seconde sous une charge maximale et que SQLite encaisse les écritures de deltas sans
+ verrous bloquants.
 
                         ┌────────────────────────────────┐
                         │      6. ECOSYSTÈME WEB3        │
@@ -100,3 +124,7 @@ Signature des Transactions : Interface fluide pour permettre au joueur de signer
 │ 5. OUTILS DE GÉNÉRATION│                      │     2. MOTEUR DE PERSISTANCE    │
 │  (Bruit Déterministe)  │                      │ (SQLite3: Macro/Micro + Deltas) │
 └────────────────────────┘                      └─────────────────────────────────┘
+
+┌──────────────────────────────────┐ 
+│ 7. OUTILS DE MAINTENANCE ET TESTS│ 
+└──────────────────────────────────┘ 
