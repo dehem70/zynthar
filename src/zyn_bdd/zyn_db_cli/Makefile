@@ -8,7 +8,7 @@ CFLAGS = -Wall -Wextra -O2 -I$(ROOT_DIR)
 LIBS = -lsqlite3
 
 # Nom de l'exécutable final
-TARGET = zyn_db_cli
+TARGET = ./bin/zyn_db_cli
 
 # Source et objets
 SRC = zyn_db_cli.c
