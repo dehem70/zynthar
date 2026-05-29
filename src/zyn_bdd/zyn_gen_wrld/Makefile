@@ -15,10 +15,10 @@ DOSSIER_OBJ := obj
 
 # Exécutables cibles
 CIBLE_TEST_NOISE := ./bin/zyn_test_noise
-CIBLE_TEST_MAP   := ./bin/zyn_test_gen_map_relief
+CIBLE_TEST_MAP   := ./bin/zyn_test_gen_map_macro
 
 # Fichiers sources mutualisés
-SRC_COMMUNS  := zyn_noise.c zyn_gen_map_relief.c zyn_gen_png.c
+SRC_COMMUNS  := zyn_noise.c zyn_gen_map_relief.c zyn_gen_map_temperature.c zyn_gen_png.c
 OBJ_COMMUNS  := $(SRC_COMMUNS:%.c=$(DOSSIER_OBJ)/%.o)
 
 # Fichiers sources spécifiques aux tests
@@ -26,7 +26,7 @@ SRC_T_NOISE  := zyn_test_noise.c
 SRC_T_MAP    := zyn_test_gen_map_relief.c
 
 OBJ_T_NOISE  := $(DOSSIER_OBJ)/zyn_test_noise.o
-OBJ_T_MAP    := $(DOSSIER_OBJ)/zyn_test_gen_map_relief.o
+OBJ_T_MAP    := $(DOSSIER_OBJ)/zyn_test_gen_map_macro.o
 
 .PHONY: all release debug clean
 

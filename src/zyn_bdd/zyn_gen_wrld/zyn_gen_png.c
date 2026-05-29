@@ -59,3 +59,20 @@ int zyn_gen_png_elevation(const MacroChunk* map, int32_t width, int32_t height, 
     
     return resultat*resultat_bin;
 }
+
+int zyn_gen_png_temperature(const MacroChunk* map, int32_t width, int32_t height, const char* filename) {
+    if (map == NULL || width <= 0 || height <= 0 || filename == NULL) return 0;
+    size_t total_pixels = (size_t)width * (size_t)height;
+    uint8_t* pixels = (uint8_t*)malloc(total_pixels * sizeof(uint8_t));
+    if (pixels == NULL) return 0;
+    for (size_t i = 0; i < total_pixels; i++) {
+        float temp = map[i].temperature;
+        /* Comme notre température est déjà strictement entre 0.0f et 1.0f,
+           la conversion en octet [0, 255] est directe et ultra-propre */
+        pixels[i] = (uint8_t)(temp * 255.0f);
+    }
+
+    int resultat = stbi_write_png(filename, width, height, 1, pixels, width);
+     free(pixels);
+    return resultat;
+}

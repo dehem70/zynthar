@@ -185,8 +185,9 @@ void zyn_gen_map_relief_archipelago(MacroChunk* map, int32_t width, int32_t heig
 
     /* 6. Second parcours : Ajustement final de la hauteur par rapport au pivot */
     for (size_t i = 0; i < total_cases; i++) {
-        map[i].elevation_max -= niveau_mer_calcule;
-        
+        float alt_brute = map[i].elevation_max - niveau_mer_calcule;
+        map[i].elevation_max = fmaxf(-1.0f, fminf(alt_brute, 1.0f));
+
         /* Injection des coordonnées géographiques réelles dans la structure */
         map[i].x = (int32_t)(i % width);
         map[i].y = (int32_t)(i / width);

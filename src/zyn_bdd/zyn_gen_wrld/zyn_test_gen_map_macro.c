@@ -17,10 +17,11 @@
 #include "zyn_noise.h"
 #include "zyn_gen_map_relief.h"
 #include "zyn_gen_png.h"
+#include "zyn_gen_map_temperature.h"
 #include <../../include/zynthar.h>
 
 #define SEED_MONDE           7777U
-#define EPSILON              1e-5f
+#define ZYN_EPSILON          1e-5f
 
 typedef struct {
     int32_t index;
@@ -83,36 +84,69 @@ int main(void) {
     printf("OK (%.4f sec)\n", ((double)(end_etape - start_etape)) / CLOCKS_PER_SEC);
 
     /* =========================================================================
-     * PHASE 4 : VÉRIFICATION DE LA NON-RÉGRESSION (DÉTERMINISME)
+     * PHASE 4 : CALCUL DU CLIMAT (TEMPÉRATURE)
      * ========================================================================= */
-    printf("\n[4/4] Vérification de la précision mathématique...\n");
+    printf("[4/5] Application du gradient thermique et effet d'altitude... ");
+    fflush(stdout);
 
-    /* Points de contrôles arbitraires sur la grille de 500 000 éléments */
-    TemoinMap temoins[] = {
-        { 0,          0.115689f }, /* Bordure  */
-        { 250500,    -0.085954f }, /* Milieu de carte  */
-        { 499999,    0.009014f }  /* Fin de carte  */
+    start_etape = clock();
+    zyn_gen_map_temperature(map, ZYN_X, ZYN_Y);
+    end_etape = clock();
+
+    printf("OK (%.4f sec)\n", ((double)(end_etape - start_etape)) / CLOCKS_PER_SEC);
+
+    /* =========================================================================
+     * PHASE 5 : VÉRIFICATION DE LA NON-RÉGRESSION (DÉTERMINISME)
+     * ========================================================================= */
+    printf("\n[4/5] Vérification de la précision mathématique (Relief + Température)...\n");
+
+    /* Structure enrichie pour tester les deux composantes */
+    typedef struct {
+        int32_t x;
+        int32_t y;
+        float alt_attendue;
+        float temp_attendue;
+    } TemoinMonde;
+
+    /* Points de contrôles sur la grille de 2 000 000 d'éléments (2000x1000) */
+    TemoinMonde temoins[] = {
+        { 1000,500,    1.000000f,  0.511644f }, /* Pôle Nord / Bordure */
+        { 500,250,    -0.315068f,  0.426988f }, /* Équateur / Centre */
+        { 1500,100,   -0.164270f,  0.140799f }  /* Pôle Sud / Fin de carte */
     };
-    
-    int32_t erreurs = 0;
-    for (int i = 0; i < 3; i++) {
-        int32_t idx = temoins[i].index;
-        float alt_obtenue = map[idx].elevation_max;
 
-        if (fabsf(alt_obtenue - temoins[i].alt_attendue) > EPSILON) {
-            fprintf(stderr, "  [ÉCHEC] MacroChunk #%d : obtenu %f, attendu %f\n", 
+    int32_t erreurs_relief = 0;
+    int32_t erreurs_climat = 0;
+
+    for (int i = 0; i < 3; i++) {
+        int32_t idx = temoins[i].y * ZYN_X + temoins[i].x;
+        float alt_obtenue = map[idx].elevation_max;
+        float temp_obtenue = map[idx].temperature;
+
+        /* Validation du relief */
+        if (fabsf(alt_obtenue - temoins[i].alt_attendue) > ZYN_EPSILON) {
+            fprintf(stderr, "  [ÉCHEC RELIEF] MacroChunk #%d : obtenu alt %f, attendu %f\n", 
                     idx, alt_obtenue, temoins[i].alt_attendue);
-            erreurs++;
+            erreurs_relief++;
+        }
+
+        /* Validation de la température */
+        if (fabsf(temp_obtenue - temoins[i].temp_attendue) > ZYN_EPSILON) {
+            fprintf(stderr, "  [ÉCHEC CLIMAT] MacroChunk #%d : obtenu temp %f, attendu %f\n", 
+                    idx, temp_obtenue, temoins[i].temp_attendue);
+            erreurs_climat++;
         }
     }
 
-    if (erreurs == 0) {
-        printf("  [SUCCÈS] La géomorphologie macro est parfaitement stable et déterministe.\n");
+    if (erreurs_relief == 0 && erreurs_climat == 0) {
+        printf("  [SUCCÈS] Le relief et le modèle thermique sont stables et déterministes.\n");
     } else {
-        printf("  [ALERTE] Malédiction ! %d écart(s) détecté(s) sur le relief témoin.\n", erreurs);
+        printf("  [ALERTE] Malédiction ! Écarts détectés (%d relief, %d climat) sur les témoins.\n", 
+                erreurs_relief, erreurs_climat);
     }
+    
 
-/* =========================================================================
+    /* =========================================================================
      * EXPORT VISUEL EN PNG
      * ============================================================================= */
     printf("\nExportation de la carte en image PNG (carte_elevation.png)... ");
@@ -122,7 +156,12 @@ int main(void) {
     } else {
         printf("[ÉCHEC]\n");
     }
-    
+
+    if (zyn_gen_png_temperature(map, ZYN_X, ZYN_Y, "carte_temperature.png")) {
+        printf("  -> 'carte_temperature.png' générée avec succès.\n");
+    } else {
+        printf("  -> [ÉCHEC] 'carte_temperature.png'\n");
+    }
     /* Nettoyage de la mémoire */
     zyn_gen_map_relief_free(map);
 
@@ -133,5 +172,5 @@ int main(void) {
     printf(" PERFORMANCE GLOBALE : Genérée en %.4f secondes (Grille complète)\n", temps_cpu);
     printf("=====================================================================\n");
 
-    return (erreurs == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
+    return (erreurs_relief==0 || erreurs_climat==0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
