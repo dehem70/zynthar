@@ -5,11 +5,11 @@
 // Auteur : Dehem70                                                                                     //
 // Date   : 28/05/2026                                                                                  //
 //                                                                                                      //
-// zyn_gen_map_macro  ; génération de la carte macro                                                    //
+// zyn_gen_map_relief  ; génération de la carte macro du relief                                         //
 //                                                                                                      //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "zyn_gen_map_macro.h"
+#include "zyn_gen_map_relief.h"
 #include "zyn_noise.h"
 #include <stdlib.h>
 #include <stdio.h>
@@ -26,7 +26,7 @@ typedef struct {
  * GESTION DE LA MÉMOIRE (ALLOCATION CONTIGUË)
  * ============================================================================= */
 
-MacroChunk* zyn_gen_map_macro_alloc(int32_t width, int32_t height) {
+MacroChunk* zyn_gen_map_relief_alloc(int32_t width, int32_t height) {
     /* Validation de sécurité sur les dimensions */
     if (width <= 0 || height <= 0) {
         fprintf(stderr, "[ERREUR] Dimensions d'allocation invalides : %dx%d\n", width, height);
@@ -48,7 +48,7 @@ MacroChunk* zyn_gen_map_macro_alloc(int32_t width, int32_t height) {
     return map;
 }
 
-void zyn_gen_map_macro_free(MacroChunk* map) {
+void zyn_gen_map_relief_free(MacroChunk* map) {
     if (map != NULL) {
         free(map);
     }
@@ -58,7 +58,7 @@ void zyn_gen_map_macro_free(MacroChunk* map) {
  * GENERATION DU MASQUE DE VORONOI
  * ============================================================================= */
 
-void zyn_gen_map_macro_voronoi(MacroChunk* map, int32_t width, int32_t height, int32_t num_islands) {
+void zyn_gen_map_relief_voronoi(MacroChunk* map, int32_t width, int32_t height, int32_t num_islands) {
     if (map == NULL || width <= 0 || height <= 0 || num_islands <= 0) return;
 
     /* Allocation d'un tableau de germes sur la pile (stack) pour une vitesse maximale */
@@ -127,11 +127,11 @@ static int comparer_floats(const void* a, const void* b) {
  * FUSION DU RELIEF & CALIBRAGE DU NIVEAU DE LA MER
  * ============================================================================= */
 
-void zyn_gen_map_macro_archipelago(MacroChunk* map, int32_t width, int32_t height, int32_t num_islands, float max_sea_percentage) {
+void zyn_gen_map_relief_archipelago(MacroChunk* map, int32_t width, int32_t height, int32_t num_islands, float max_sea_percentage) {
     if (map == NULL || width <= 0 || height <= 0) return;
 
     /* 1. On s'assure d'abord que le masque de Voronoi est bien calculé dans la grille */
-    zyn_gen_map_macro_voronoi(map, width, height, num_islands);
+    zyn_gen_map_relief_voronoi(map, width, height, num_islands);
 
     size_t total_cases = (size_t)width * (size_t)height;
 
@@ -201,7 +201,7 @@ void zyn_gen_map_macro_archipelago(MacroChunk* map, int32_t width, int32_t heigh
  * LISSAGE DES CÔTES PAR AUTOMATE CELLULAIRE (VOISINAGE DE MOORE)
  * ============================================================================= */
 
-void zyn_gen_map_macro_smooth_coastlines(MacroChunk* map, int32_t width, int32_t height, int32_t iterations) {
+void zyn_gen_map_relief_smooth_coastlines(MacroChunk* map, int32_t width, int32_t height, int32_t iterations) {
     if (map == NULL || width <= 0 || height <= 0 || iterations <= 0) return;
 
     size_t total_cases = (size_t)width * (size_t)height;

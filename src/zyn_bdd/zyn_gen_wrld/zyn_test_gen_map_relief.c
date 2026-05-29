@@ -5,7 +5,7 @@
 // Auteur : Dehem70                                                                                     //
 // Date   : 28/05/2026                                                                                  //
 //                                                                                                      //
-// zyn_test_gen_map_macro  ; tests regression et performance pour zyn_gen_map_macro                     //
+// zyn_test_gen_map_relief  ; tests regression et performance pour zyn_gen_map_relief                   //
 //                                                                                                      //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -15,7 +15,7 @@
 #include <math.h>
 #include <string.h>
 #include "zyn_noise.h"
-#include "zyn_gen_map_macro.h"
+#include "zyn_gen_map_relief.h"
 #include "zyn_gen_png.h"
 #include <../../include/zynthar.h>
 
@@ -29,7 +29,7 @@ typedef struct {
 
 int main(void) {
     printf("=====================================================================\n");
-    printf("     ZYNTHAR : MODULE DE TEST & BENCHMARK (zyn_gen_map_macro)        \n");
+    printf("     ZYNTHAR : MODULE DE TEST & BENCHMARK (zyn_gen_map_relief)       \n");
     printf("=====================================================================\n\n");
 
     clock_t start_global, end_global;
@@ -48,7 +48,7 @@ int main(void) {
     fflush(stdout);
     
     start_etape = clock();
-    MacroChunk* map = zyn_gen_map_macro_alloc(ZYN_X, ZYN_Y);
+    MacroChunk* map = zyn_gen_map_relief_alloc(ZYN_X, ZYN_Y);
     end_etape = clock();
     
     if (map == NULL) return EXIT_FAILURE;
@@ -65,7 +65,7 @@ int main(void) {
 
     start_etape = clock();
     /* Génération brute de l'archipel avec 45% de mer par défaut */
-    zyn_gen_map_macro_archipelago(map, ZYN_X, ZYN_Y, 4, 0.55f);
+    zyn_gen_map_relief_archipelago(map, ZYN_X, ZYN_Y, 4, 0.55f);
     end_etape = clock();
     
     printf("OK (%.4f sec)\n", ((double)(end_etape - start_etape)) / CLOCKS_PER_SEC);
@@ -77,7 +77,7 @@ int main(void) {
     fflush(stdout);
 
     start_etape = clock();
-    zyn_gen_map_macro_smooth_coastlines(map, ZYN_X, ZYN_Y, 3);
+    zyn_gen_map_relief_smooth_coastlines(map, ZYN_X, ZYN_Y, 3);
     end_etape = clock();
 
     printf("OK (%.4f sec)\n", ((double)(end_etape - start_etape)) / CLOCKS_PER_SEC);
@@ -124,7 +124,7 @@ int main(void) {
     }
     
     /* Nettoyage de la mémoire */
-    zyn_gen_map_macro_free(map);
+    zyn_gen_map_relief_free(map);
 
     end_global = clock();
     temps_cpu = ((double)(end_global - start_global)) / CLOCKS_PER_SEC;
