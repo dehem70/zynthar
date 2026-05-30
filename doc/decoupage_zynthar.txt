@@ -47,7 +47,7 @@ sphère d'interaction (ex: portée de 3 mètres pour modifier un bloc).
 
 La brique qui permet d'initialiser votre univers.
 
-Le Générateur de Squelette (Python ou C) : Le script (similaire à celui que nous avons testé) utilisant des algorithmes de bruit (Perlin/Simplex) pour pré-calculer et 
+Le Générateur de Squelette (C) : Le script (similaire à celui que nous avons testé) utilisant des algorithmes de bruit (Perlin/Simplex) pour pré-calculer et 
 remplir la base SQLite des 2 millions de macro-chunks avec les biomes, températures et humidités.
 
 

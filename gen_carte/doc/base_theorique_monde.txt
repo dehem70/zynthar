@@ -1,4 +1,4 @@
-Synthèse Architecturale de la Voie V4
+Synthèse Architecturale
 1. Le Stockage (Base de données SQLite3 - Statique & Léger)
 MacroChunks (Grille de 500m / ~2M de lignes) : Stocke uniquement le squelette du monde : type de biome, température, humidité et élévation maximale théorique.
 

@@ -88,19 +88,19 @@ Implémenter la boucle physique locale dans Babylon.js pour réagir instantaném
 Développer le tracé de rayon depuis la caméra pour détecter le voxel visé par le joueur et bloquer l'action si la distance est supérieure au rayon de la sphère d'interaction définie.
 
 
-🛠️ Brique 5 : Les Outils de Génération Procédurale Offline (Python)
+🛠️ Brique 5 : Les Outils de Génération Procédurale Offline (C)
 
 
 L'objectif est de créer le fichier de base de données initial qui contient le "squelette" du monde.
 
 [ ] Tâche 5.1 : Script de découpage géométrique
-Créer le script Python qui boucle sur la grille complète de 2000×1000 macro-chunks.
+Créer le programme qui boucle sur la grille complète de 2000×1000 macro-chunks.
 
 [ ] Tâche 5.2 : Générateur macro-procédural
 Calculer à grande échelle, via des bruits superposés (bruit de gradient), les zones climatiques (température, humidité) et les reliefs généraux du monde.
 
 [ ] Tâche 5.3 : Injecteur de masse SQLite (Bulk Insert)
-Optimiser l'écriture en base via Python en utilisant des transactions massives pour générer le fichier .db final de 2 millions de lignes en moins de 10 secondes.
+Optimiser l'écriture en base en utilisant des transactions massives pour générer le fichier .db final de 2 millions de lignes en moins de 10 secondes.
 
 
 🪙 Brique 6 : Écosystème Web3 & Économie (Smart Contracts)
