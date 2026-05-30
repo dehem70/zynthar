@@ -44,6 +44,14 @@
 #define ZYN_BIOME_MONTAGNE_ROCHEUSE 11
 #define ZYN_BIOME_PIC_ENNEIGE       12
 
+// Outils de conversion d'unités (Mètres <-> Décimètres)
+#define M_TO_DM(m)   ((int16_t)((m) * 10.0f))
+#define DM_TO_M(dm)  ((float)(dm) / 10.0f)
+
+// Outils de conversion climatiques (Float 0.0-1.0 <-> Uint8 0-255)
+#define FLOAT_TO_RAW(f)  (((uint8_t)((f) * 255.0f))-ZYN_WORLD_TEMP_MIN)/(ZYN_WORLD_TEMP_MAX-ZYN_WORLD_TEMP_MIN)
+#define RAW_TO_FLOAT(r)  (ZYN_WORLD_TEMP_MIN+(((float)(r) / 255.0f)*(ZYN_WORLD_TEMP_MAX-ZYN_WORLD_TEMP_MIN)))
+
 /**
  * @brief Structure ultra-optimisée représentant un MacroChunk.
  * Taille totale : 12 octets.

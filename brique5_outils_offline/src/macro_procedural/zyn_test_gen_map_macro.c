@@ -27,10 +27,6 @@
 #define SEED_MONDE           7777U
 #define ZYN_EPSILON          1e-5f
 
-// Outils de décompression d'unités pour la validation des données témoins
-#define DM_TO_M(dm)      ((float)(dm) / 10.0f)
-#define RAW_TO_FLOAT(r)  (ZYN_WORLD_TEMP_MIN+(((float)(r) / 255.0f)*(ZYN_WORLD_TEMP_MAX-ZYN_WORLD_TEMP_MIN)))
-
 /**
  * @brief Structure enrichie pour le contrôle de non-régression du monde macro.
  */

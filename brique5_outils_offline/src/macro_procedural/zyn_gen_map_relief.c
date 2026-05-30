@@ -21,10 +21,6 @@
 #include "zyn_noise.h"
 #include "zyn_gen_map_relief.h"
 
-// Outils de conversion d'unités (Mètres <-> Décimètres)
-#define M_TO_DM(m)   ((int16_t)((m) * 10.0f))
-#define DM_TO_M(dm)  ((float)(dm) / 10.0f)
-
 /* Structure interne locale pour stocker les positions des germes d'îles (Plan horizontal X/Z) */
 typedef struct {
     float x;

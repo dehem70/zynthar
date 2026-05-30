@@ -1,0 +1,105 @@
+## 🚧 Brique 1 : Le Serveur Central (C Pur)
+
+**Objectif :** Créer l'exécutable principal du serveur et sa boucle logique temporelle.
+
+- [ ] **Tâche 1.1 : Structure de la boucle principale (Tickrate)** Implémenter l'horloge fixe à 20 Hz (un tick toutes les 50 ms) en C sans dérive temporelle via des _high-resolution timers_.
+    
+- [ ] **Tâche 1.2 : File d'attente des messages (Message Queue)** Développer une structure de données _thread-safe_ pour stocker les inputs des joueurs à leur arrivée et les consommer séquentiellement au début de chaque tick.
+    
+- [ ] **Tâche 1.3 : Gestionnaire d'état des joueurs** Créer la structure `Player` en C incluant : ID, adresse de wallet, position exacte ($X, Y, Z$), vitesse, et chunk actuel.
+    
+- [ ] **Tâche 1.4 : Moteur de collision Voxel / AABB** Écrire l'algorithme mathématique de collision entre la boîte englobante du joueur (_Bounding Box_) et les cubes du micro-chunk environnant.
+    
+- [ ] **Tâche 1.5 : Implémentation des règles métiers de mouvement** - Coder le système d'enjambement automatique pour les obstacles $< 40\text{ cm}$.
+    
+    - Coder la règle de blocage ou glissement pour les obstacles entre $40\text{ cm}$ et $1,60\text{ m}$.
+        
+    - Intégrer la vérification de la distance minimale de $1\text{ m}$ entre deux joueurs.
+        
+
+## 🗄️ Brique 2 : Le Moteur de Persistance & Génération Locale (C + SQLite3)
+
+**Objectif :** Lier le serveur en C à SQLite3 et générer le terrain au format brut.
+
+- [ ] **Tâche 2.1 : Binding et initialisation de SQLite3 en C** Intégrer la bibliothèque SQLite3 dans le projet C et configurer les PRAGMA de performance (`WAL`, `synchronous = NORMAL`).
+    
+- [ ] **Tâche 2.2 : Couche d'accès Macro-Chunks** Écrire la fonction C permettant de récupérer instantanément les métadonnées d'un macro-chunk (biome, élévation, etc.) via la clé primaire composite (`chunk_x`, `chunk_y`).
+    
+- [ ] **Tâche 2.3 : Intégration des fonctions de Bruit Mathématique** Implémenter un algorithme de bruit (Perlin ou Simplex) en C pur, de manière déterministe, prenant en entrée les coordonnées et la seed.
+    
+- [ ] **Tâche 2.4 : Décorateur de Biomes** Écrire les algorithmes en C qui traduisent les valeurs de bruit en blocs (ex: si `biome == désert` $\rightarrow$ générer du sable en surface jusqu'à une certaine profondeur).
+    
+- [ ] **Tâche 2.5 : Système de gestion des deltas (Modifications)** - Créer le schéma de la table SQL pour les micro-chunks modifiés.
+    
+    - Écrire les fonctions de lecture et d'écriture des blocs posés ou détruits par les joueurs.
+        
+- [ ] **Tâche 2.6 : Assembleur de Chunk** Développer la fonction qui fusionne le tableau de voxels "neuf" (généré par le bruit) et la liste des deltas (extraits de SQLite) pour obtenir l'état final du micro-chunk.
+    
+
+## 🌐 Brique 3 : La Couche Réseau Hybride (C / JS)
+
+**Objectif :** Ouvrir les sockets et faire transiter les données au format le plus léger possible.
+
+- [ ] **Tâche 3.1 : Serveur WebSockets / WebTransport en C** Mettre en place la couche réseau capable d'accepter 100 connexions simultanées en C (via une bibliothèque comme `libwebsockets` ou des sockets bruts).
+    
+- [ ] **Tâche 3.2 : Algorithme de la zone d'intérêt (AoI)** Écrire le gestionnaire qui calcule à chaque tick quels micro-chunks et quels joueurs se trouvent dans le champ de vision (la bulle) de chaque utilisateur.
+    
+- [ ] **Tâche 3.3 : Compresseur RLE (Run-Length Encoding)** Développer la fonction C qui compresse un tableau de voxels 3D ($32 \times 32 \times 32$) en une suite binaire optimisée.
+    
+- [ ] **Tâche 3.4 : Schémas de sérialisation FlatBuffers** - Définir les fichiers de schéma `.fbs` pour les paquets réseau (`PositionJoueur`, `ModificationBloc`, `DemandeChunk`).
+    
+    - Compiler les schémas pour générer le code C (serveur) et TypeScript (client).
+        
+
+## 🎮 Brique 4 : Le Client 3D (TypeScript / Babylon.js)
+
+**Objectif :** Bâtir l'interface graphique capable d'afficher le monde et de prédire la physique.
+
+- [ ] **Tâche 4.1 : Architecture PWA & Scène Babylon.js** - Initialiser le projet TypeScript/Vite et configurer le manifeste PWA pour une exécution fluide sur Chromebook.
+    
+    - Mettre en place la scène 3D de base avec une caméra à la première personne.
+        
+- [ ] **Tâche 4.2 : Module de décompression et maillage des Voxels (Meshing)** - Écrire le décompresseur RLE en TypeScript.
+    
+    - Développer l'algorithme de Meshing (optimisé de type _Greedy Meshing_) pour transformer le tableau de voxels en maillages 3D affichables par Babylon.js.
+        
+- [ ] **Tâche 4.3 : Client-Side Prediction (Prédiction de mouvement)** Implémenter la boucle physique locale dans Babylon.js pour réagir instantanément aux touches de direction du clavier.
+    
+- [ ] **Tâche 4.4 : Algorithme de Réconciliation** Écrire le code de correction qui ajuste en douceur la position locale de la caméra si le paquet binaire d'autorité du serveur affiche un écart de position.
+    
+- [ ] **Tâche 4.5 : Portée d'interaction (Raycasting)** Développer le tracé de rayon depuis la caméra pour détecter le voxel visé par le joueur et bloquer l'action si la distance est supérieure au rayon de la sphère d'interaction définie.
+    
+
+## 🛠️ Brique 5 : Les Outils de Génération Procédurale Offline (C)
+
+**Objectif :** Créer le fichier de base de données initial qui contient le "squelette" du monde.
+
+- [ ] **Tâche 5.1 : Script de découpage géométrique** Créer le programme qui boucle sur la grille complète de $2\,000 \times 1\,000$ macro-chunks.
+    
+- [ ] **Tâche 5.2 : Générateur macro-procédural** Calculer à grande échelle, via des bruits superposés (bruit de gradient), les zones climatiques (température, humidité) et les reliefs généraux du monde.
+    
+- [ ] **Tâche 5.3 : Injecteur de masse SQLite (Bulk Insert)** Optimiser l'écriture en base en utilisant des transactions massives pour générer le fichier `.db` final de 2 millions de lignes en moins de 10 secondes.
+    
+
+## 🪙 Brique 6 : Écosystème Web3 & Économie (Smart Contracts)
+
+**Objectif :** Sécuriser la propriété et intégrer le modèle économique basé sur vos tests.
+
+- [ ] **Tâche 6.1 : Déploiement et Audit du contrat "gain"** Finaliser le smart contract sur le réseau de test MultiversX pour gérer l'enregistrement ou les pools de jetons.
+    
+- [ ] **Tâche 6.2 : Module d'authentification xPortal / DeFi Wallet** Intégrer le SDK d'authentification MultiversX dans le client Web pour permettre aux joueurs de se connecter avec leur portefeuille.
+    
+- [ ] **Tâche 6.3 : Relais de validation (Oracle interne en C)** Développer un micro-service qui écoute les événements de la blockchain MultiversX et transmet au serveur en C la confirmation qu'un joueur possède un droit ou un item spécifique.
+    
+
+## 🧰 Brique 7 : Outillage, Maintenance & Tests (Python / CLI)
+
+**Objectif :** Valider le code et s'assurer de l'absence de bugs majeurs avant d'ouvrir aux joueurs.
+
+- [ ] **Tâche 7.1 : Outil CLI de Gestion et Maintenance** Écrire un outil en ligne de commande qui permet de créer, requêter et maintenir (corrections) les différentes bases de données.
+    
+- [ ] **Tâche 7.2 : Test de cohérence du déterminisme (Cross-Language)** Écrire un outil scripté qui génère un chunk en C et le même chunk en TypeScript, puis compare les fichiers binaires pour s'assurer que les reliefs sont identiques au bloc près.
+    
+- [ ] **Tâche 7.3 : Cartographe 2D du monde** Développer un script Python qui extrait les 2 millions de lignes de macro-chunks et génère une image haute résolution représentant la carte globale du monde de Zynthar pour audit visuel.
+    
+- [ ] **Tâche 7.4 : Simulateur de charge réseau (Load Tester)** Créer un script en C ou Python capable d'émuler 100 clients virtuels (_bots_) se déplaçant simultanément pour mesurer les performances CPU du serveur et les temps de réponse de SQLite en situation de stress.

@@ -33,14 +33,6 @@
 // Inclusion globale propre de la source de vérité géométrique
 #include <zynthar.h>
 
-// Outils de conversion d'unités (Mètres <-> Décimètres)
-#define M_TO_DM(m)   ((int16_t)((m) * 10.0f))
-#define DM_TO_M(dm)  ((float)(dm) / 10.0f)
-
-// Outils de conversion climatiques (Float 0.0-1.0 <-> Uint8 0-255)
-#define FLOAT_TO_RAW(f)  ((uint8_t)((f) * 255.0f))
-#define RAW_TO_FLOAT(r)  ((float)(r) / 255.0f)
-
 // Fonction d'aide pour afficher l'usage du CLI
 void print_usage(const char *prog_name) {
     printf("Usage: %s <commande> [options]\n", prog_name);

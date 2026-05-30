@@ -16,9 +16,6 @@
 #include "zyn_noise.h"
 #include "zyn_gen_map_temperature.h"
 
-#define DM_TO_M(dm)  ((float)(dm) / 10.0f)
-#define FLOAT_TO_RAW(f)  ((uint8_t)((f) * 255.0f))
-
 void zyn_gen_map_temperature(MacroChunk* map, int32_t width_x, int32_t depth_z) {
     if (map == NULL || width_x <= 0 || depth_z <= 0) return;
 

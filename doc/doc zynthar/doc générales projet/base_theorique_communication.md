@@ -1,0 +1,64 @@
+
+## 1. La stratégie de réplication : Le principe de la "Bulle d'Intérêt" (AoI)
+
+Il est hors de question d'envoyer les actions des 100 joueurs à tout le monde, et encore moins de charger toute la carte. Chaque joueur possède une **Area of Interest (AoI)**.
+
+- **Niveau Macro :** Le serveur n'envoie les métadonnées des macro-chunks (météo, biome) que lorsque le joueur franchit une frontière de 500 m.
+    
+- **Niveau Micro :** Le serveur maintient une "bulle" de chunks haute résolution (en voxels) autour du joueur (par exemple, un rayon de 150 m). Tout ce qui se passe en dehors de cette bulle n'est jamais envoyé au client.
+    
+
+## 2. Le format des données : Bannir le JSON, passer au binaire pur
+
+Pour votre prototype ou vos outils web, le JSON est pratique. En production avec 100 joueurs, c'est un **suicide réseau** car il est beaucoup trop lourd à cause du format texte.
+
+- **Ce qu'il faut faire :** Envoyer des paquets binaires bruts sous forme de tableaux d'octets (_Byte Arrays_).
+    
+- **L'outil idéal :** Utilisez des protocoles de sérialisation ultra-légers comme **Protocol Buffers (Protobuf)** ou **FlatBuffers** (créé par Google spécifiquement pour les jeux vidéo).
+    
+
+> ### ❓ Pourquoi FlatBuffers ?
+> 
+> Il permet de lire les données reçues par le réseau en JavaScript / Babylon.js **sans même avoir à les désérialiser**. Cela économise une quantité massive de mémoire vive et de temps CPU sur le client.
+
+## 3. L'optimisation spécifique aux Voxels : Le Run-Length Encoding (RLE)
+
+Si un joueur modifie le relief et crée une tranchée, vous devez lui envoyer le micro-chunk modifié. Un chunk de voxels non optimisé peut être extrêmement lourd:
+
+- Si un chunk fait $32 \times 32 \times 32 = 32\,768$ blocs, envoyer 1 octet par bloc représente **32 Ko par chunk**.
+    
+- Multiplié par 100 joueurs, le réseau va rapidement saturer.
+    
+
+La solution est le **RLE (Run-Length Encoding)**, une compression parfaite pour les mondes de voxels:
+
+- **Au lieu d'envoyer :** `Terre, Terre, Terre, Terre, Terre, Air, Air, Air`
+    
+- **Vous envoyez :** `5xTerre, 3xAir`
+    
+
+Dans un monde cubique où la roche et l'air se répètent massivement, cette compression algorithmique (exécutée à la volée en C sur le serveur) **réduit la taille des paquets de 90% à 95%**.
+
+## 4. Le choix des protocoles : Le modèle hybride UDP / TCP
+
+Votre serveur en C va devoir gérer deux types de messages, qui nécessitent deux canaux différents:
+
+|**Type de donnée**|**Exigence**|**Protocole idéal**|**Exemple dans Zynthar**|
+|---|---|---|---|
+|**Critique & Fiable**|Ne doit jamais être perdu, l'ordre des paquets importe.|**TCP** (ou WebSockets / WebTransport)|Un achat en jeu, la connexion, la modification définitive d'un bloc.|
+|**Volatile & Rapide**|La vitesse prime. Si un paquet est perdu, tant pis, le suivant arrivera.|**UDP** (ou WebRTC pour le web)|La position (X, Y, Z) du joueur qui court toutes les 50 ms.|
+
+Puisque votre client s'exécute en HTML5 / Babylon.js, le protocole standard pour l'UDP dans le navigateur est le **WebRTC** (ou le récent **WebTransport**), tandis que le TCP passe par les **WebSockets**.
+
+## 📌 En résumé pour votre cadrage
+
+Le réseau sera effectivement votre goulot d'étranglement, mais il est tout à fait maîtrisable. En combinant :
+
+1. Un serveur en C qui compresse les deltas de voxels en **RLE / FlatBuffers**.
+    
+2. Une **Bulle d'Intérêt (AoI)** stricte par joueur.
+    
+3. Le **streaming asynchrone** des chunks géré par Babylon.js en tâche de fond.
+    
+
+Le transfert réseau sera si fluide que vos 100 joueurs auront l'impression de jouer en local.
