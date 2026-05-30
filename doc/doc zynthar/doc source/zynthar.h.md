@@ -46,14 +46,53 @@ L'élévation est stockée en décimètres (`int16_t`) pour économiser 2 octets
     (Restitution pour le moteur physique).
     
 
-### B. Métriques Climatiques (Float $[0.0, 1.0]$ $\leftrightarrow$ Uint8 $[0, 255]$)
+## 🌡️ B. Formule de Compression : `FLOAT_TO_RAW(f)`
 
-Normalise et transpose les valeurs de température générées par les bruits mathématiques vers la plage réelle du monde de Zynthar (de **-25°C** à **45°C**).
+Cette formule prend la valeur brute du bruit procédural (un `float` strictement compris entre $0.0\text{ f}$ et $1.0\text{ f}$) et la convertit en un entier non signé sur un octet (`uint8_t` de $0$ à $255$).
 
-- **`FLOAT_TO_RAW(f)`** : Évalue la valeur flottante `f` ($[0.0, 1.0]$), la projette sur la plage d'octets `[0, 255]` et applique le décalage thermique de Zynthar.
+### La macro C corrigée :
+
+C
+
+```
+#define FLOAT_TO_RAW(f)  ((uint8_t)((f) * 255.0f))
+```
+
+### 🧠 Décryptage mathématique :
+
+Pour isoler proprement la valeur sur un octet sans interférence, le calcul suit une application linéaire directe :
+
+$$f \in [0.0, 1.0] \xrightarrow{\times 255.0} [0.0, 255.0] \xrightarrow{\text{cast}} \text{raw} \in \{0, 1, \dots, 255\}$$
+
+- **Sécurité de typage :** Le cast explicite `(uint8_t)` est placé à l'extérieur de l'opération mathématique. Le CPU va ainsi tronquer correctement la partie décimale du flottant résultant pour l'inscrire dans l'unique octet `temperature_raw` de ta structure `MacroChunk`.
     
-- **`RAW_TO_FLOAT(r)`** : Décompresse la valeur brute `r` (`uint8_t`) pour restituer la température mathématique exacte en jeu.
+
+## 🔄C. Formule de Décompression Moteur : `RAW_TO_FLOAT(r)`
+
+Cette formule est appelée par le serveur C lorsqu'il extrait un `MacroChunk` de SQLite. Elle utilise l'octet stocké `r` ($0$ à $255$) pour interpoler et restituer la température physique finale en degrés Celsius, calibrée sur la plage réelle de Zynthar (de $-25^\circ\text{C}$ à $+45^\circ\text{C}$).
+
+### La macro C corrigée :
+
+C
+
+```
+#define RAW_TO_FLOAT(r)  ((float)(ZYN_WORLD_TEMP_MIN) + (((float)(r) / 255.0f) * (float)(ZYN_WORLD_TEMP_MAX - ZYN_WORLD_TEMP_MIN)))
+```
+
+### 🧠 Décryptage mathématique :
+
+L'opération effectue une interpolation linéaire (Lerp). Avec les constantes définies de ton univers :
+
+- $$ZYN\_WORLD\_TEMP\_MIN = -25$$
     
+- $$ZYN\_WORLD\_TEMP\_MAX - ZYN\_WORLD\_TEMP\_MIN = 45 - (-25) = 70$$
+    
+
+La formule se simplifie ainsi au calcul CPU :
+
+$$\text{Température}(^\circ\text{C}) = -25.0f + \left( \frac{r}{255.0f} \times 70.0f \right)$$
+
+- **Sécurité de typage :** Le cast `(float)(r)` force le processeur à effectuer une division flottante. Sans cela, le compilateur C ferait une division entière de type `r / 255`, dont le résultat vaudrait systématiquement `0` (sauf si $r = 255$, ce qui donnerait `1`).
 
 ## 📋 3. Liste exhaustive des Constantes et Variables Globales
 
