@@ -14,7 +14,9 @@
 #define ZYN_WORLD_Z_MAX         500224   // Largeur : 500.224 km   (19540 Micro-Chunks)
 #define ZYN_WORLD_Y_MIN         -1024    // Profondeur max : -1024 m (Exactement 40 Micro-Chunks sous Y=0)
 #define ZYN_WORLD_Y_MAX         2048     // Hauteur max : +2048 m     (Exactement 80 Micro-Chunks au-dessus de Y=0)
-#define ZYN_NIV_MER             0        // Niveau de la mer = Frontière stricte de Chunk
+#define ZYN_SEA_LEVEL           0        // Niveau de la mer = Frontière stricte de Chunk
+#define ZYN_WORLD_TEMP_MIN      -25
+#define ZYN_WORLD_TEMP_MAX      45
 
 // --- Dimensions Structurelles Géométriques (Essentielles au moteur) ---
 #define ZYN_VOXEL_TO_M          0.1f     // Un voxel = 10 cm de côté

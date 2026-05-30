@@ -225,29 +225,41 @@ void zyn_gen_map_relief_archipelago(MacroChunk* map, int32_t width_x, int32_t de
             min_brut_mer = alt_relative;
         }
     }
+    
+    /* Extraction des constantes dynamiques depuis zynthar.h (exprimées en mètres) */
+    float max_monde_config_m  = (float)ZYN_WORLD_Y_MAX;
+    float min_monde_config_m  = (float)ZYN_WORLD_Y_MIN;
 
+    /* CALCUL DES COEFFICIENTS BASÉ SUR L'ESPACE DISPONIBLE REEL */
+    float hauteur_terre_dispo  = fabsf(max_monde_config_m);
+    float profondeur_mer_dispo = fabsf(min_monde_config_m);
+    
     /* CALCUL DES COEFFICIENTS LINÉAIRES DE CORRECTION ASYMÉTRIQUE */
-    float coef_positif = ZYN_WORLD_Y_MAX / max_brut_terre;
-    float coef_negatif = ZYN_WORLD_Y_MIN / min_brut_mer; // Négatif / Négatif = Ratio positif
+    float coef_positif = hauteur_terre_dispo / max_brut_terre;
+    float coef_negatif = profondeur_mer_dispo / fabsf(min_brut_mer);
 
     /* =========================================================================
      * ÉTAPE 6 : ÉTALEMENT PAR MORCEAUX ET UNIQUE COMPRESSION FINALE
      * ========================================================================= */
     for (size_t i = 0; i < total_cases; i++) {
         float alt_relative = hauteurs_triees[i] - niveau_mer_calcule;
-        float alt_finale_m = 0.0f;
+        float alt_finale_m = 0.0f ;
 
-        /* Application du coefficient linéaire dédié selon le domaine */
+        /* Le coefficient étire le relief, et on l'ajoute au niveau de la mer de référence */
         if (alt_relative > 0.0f) {
-            alt_finale_m = alt_relative * coef_positif;
+            // On monte : niveau de la mer + (distance relative étirée)
+            alt_finale_m = (alt_relative * coef_positif);
         } else if (alt_relative < 0.0f) {
-            alt_finale_m = alt_relative * coef_negatif;
+            // On descend : niveau de la mer - (distance relative absolue étirée)
+            alt_finale_m = -(fabsf(alt_relative) * coef_negatif);
         }
 
-        // Bornage de sécurité physique ultime de ton architecture
-        float alt_clamped_m = fmaxf(ZYN_WORLD_Y_MIN, fminf(alt_finale_m, ZYN_WORLD_Y_MAX));
+        // Bornage de sécurité dynamique basé sur la configuration de zynthar.h
+        float limite_basse = fminf(min_monde_config_m, max_monde_config_m);
+        float limite_haute = fmaxf(min_monde_config_m, max_monde_config_m);
+        float alt_clamped_m = fmaxf(limite_basse, fminf(alt_finale_m, limite_haute));
 
-        /* L'unique arrondi de la chaîne : passage au type de stockage int16_t en dm */
+        /* L'unique arrondi de la chaîne : passage en int16_t décimètres */
         map[i].elevation_max_dm = (int16_t)roundf(alt_clamped_m * 10.0f);
         map[i].chunk_x = (int32_t)(i % width_x);
         map[i].chunk_z = (int32_t)(i / width_x);

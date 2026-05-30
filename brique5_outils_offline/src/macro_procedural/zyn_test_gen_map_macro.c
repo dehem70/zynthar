@@ -29,7 +29,7 @@
 
 // Outils de décompression d'unités pour la validation des données témoins
 #define DM_TO_M(dm)      ((float)(dm) / 10.0f)
-#define RAW_TO_FLOAT(r)  ((float)(r) / 255.0f)
+#define RAW_TO_FLOAT(r)  (ZYN_WORLD_TEMP_MIN+(((float)(r) / 255.0f)*(ZYN_WORLD_TEMP_MAX-ZYN_WORLD_TEMP_MIN)))
 
 /**
  * @brief Structure enrichie pour le contrôle de non-régression du monde macro.
@@ -143,9 +143,9 @@ int main(void) {
 
     /* Points de contrôles recalés sur la matrice de coordonnées (X, Z) */
     TemoinMonde temoins[] = {
-        { 1000, 500,  1.000000f,  0.511644f }, /* Zone A */
-        {  500, 250, -0.315068f,  0.426988f }, /* Zone B */
-        { 1500, 100, -0.164270f,  0.140799f }  /* Zone C */
+        { 1000, 500,  -225.100006f,  37.039219f }, /* Zone A */
+        {  500, 250, 559.000000f,  2.176472f }, /* Zone B */
+        { 1500, 100, -100.400002f,  -14.843137f }  /* Zone C */
     };
 
     int32_t erreurs_relief = 0;

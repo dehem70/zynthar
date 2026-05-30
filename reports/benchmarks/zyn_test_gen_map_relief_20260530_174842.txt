@@ -1,0 +1,27 @@
+=====================================================================
+     ZYNTHAR : PIPELINE GLOBAL DE GÉNÉRATION MACRO-GEOMORPHOLOGIQUE  
+=====================================================================
+ Fichier généré : zyn_test_gen_map_relief_20260530_174842.txt
+ Rapport d'accès: /home/dehem/Dev/zynthar/reports/benchmarks/zyn_test_gen_map_relief_20260530_174842.txt
+=====================================================================
+
+[1/5] Allocation de la grille MacroChunks (1955x977)... OK (0.0000 sec)
+[2/5] Calcul de l'archipel & calibration mer (4 îles, 55% eau)... OK (0.4591 sec)
+[3/5] Lissage des lignes de côtes par AC (3 itérations)... OK (0.0103 sec)
+[4/5] Application du gradient thermique longitudinal et altitude... OK (0.0564 sec)
+
+[5/5] Vérification de la précision mathématique (Relief + Température)...
+  [ÉCHEC GEOMORPHO] MacroChunk #978500 (X:1000, Z:500) : obtenu alt 225.100006m, attendu 1.000000m (Ajustement requis)
+  [ÉCHEC MOD_CLIMAT] MacroChunk #978500 (X:1000, Z:500) : obtenu temp 0.796079, attendu 0.511644 (Ajustement requis)
+  [ÉCHEC GEOMORPHO] MacroChunk #489250 (X:500, Z:250) : obtenu alt 559.000000m, attendu -0.315068m (Ajustement requis)
+  [ÉCHEC MOD_CLIMAT] MacroChunk #489250 (X:500, Z:250) : obtenu temp 0.211765, attendu 0.426988 (Ajustement requis)
+  [ÉCHEC GEOMORPHO] MacroChunk #197000 (X:1500, Z:100) : obtenu alt 100.400002m, attendu -0.164270m (Ajustement requis)
+  [ÉCHEC MOD_CLIMAT] MacroChunk #197000 (X:1500, Z:100) : obtenu temp 0.101961, attendu 0.140799 (Ajustement requis)
+  [ALERTE] Écarts détectés lors de la vérification. Si les axes ou le packaging (décimètres) viennent de changer, recalibrez les témoins.
+
+Exportation des matrices d'octets en images PNG... OK !
+  -> Fichiers 'carte_elevation.png', 'carte_elevation_bin.png' et 'carte_temperature.png' générés.
+
+=====================================================================
+ VITESSE PIPELINE MONDIAL : Généré en 0.7538 secondes (Chaîne complète)
+=====================================================================

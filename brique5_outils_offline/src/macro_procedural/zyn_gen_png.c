@@ -64,7 +64,7 @@ int zyn_gen_png_elevation(const MacroChunk* map, int32_t width_x, int32_t depth_
          * On utilise le signe de l'altitude packagée : 
          * Si max_elevation > 0 (terre), la condition vaut 1, le pixel prend 255 (blanc).
          * Si max_elevation <= 0 (mer), la condition vaut 0, le pixel prend 0 (noir). */
-        pixels_bin[i] = (map[i].elevation_max_dm > 0) ? 255 : 0;
+        pixels_bin[i] = (map[i].elevation_max_dm > ZYN_SEA_LEVEL) ? 255 : 0;
     }
 
     /* Écriture des deux fichiers PNG via STB
