@@ -1,0 +1,11 @@
+{
+  "project": {
+    "name": "Zynthar",
+    "author" : "Dehem70",
+    "version": "0.1.0"
+  },
+  "server": {
+    "port_API": 8080,
+    "port_web" : 8000
+  }
+}

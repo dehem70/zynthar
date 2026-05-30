@@ -3,54 +3,74 @@
 # Arrêter le script en cas d'erreur inattendue
 set -e
 
-# 1. Vérification du paramètre (si le nom du fichier est fourni)
+# Vérification du paramètre (si le nom du fichier est fourni)
 if [ -z "$1" ]; then
     echo "Erreur : Tu dois spécifier un nom de fichier."
     echo "Usage : new_c nom_fichier"
     exit 1
 fi
 
-NOM_FICHIER="$1"
+# Nettoyage de l'argument au cas où l'utilisateur a écrit l'extension
+ENTREE="$1"
+NOM_SANS_EXT="${ENTREE%.c}"
+NOM_SANS_EXT="${NOM_SANS_EXT%.h}"
 
-# Ajoute automatiquement .c si l'utilisateur ne l'a pas écrit
-if [[ "$NOM_FICHIER" != *.c ]]; then
-    NOM_FICHIER="${NOM_FICHIER}.c"
-fi
+FICHIER_C="${NOM_SANS_EXT}.c"
+FICHIER_H="${NOM_SANS_EXT}.h"
 
-# Extraction du nom seul sans extension pour l'en-tête
-NOM_SANS_EXT="${NOM_FICHIER%.c}"
-
-# 2. Vérification que la variable d'environnement ZYNTHAR_ROOT existe
+# Vérification que la variable d'environnement ZYNTHAR_ROOT existe
 if [ -z "$ZYNTHAR_ROOT" ]; then
     echo "Erreur : La variable \$ZYNTHAR_ROOT n'est pas définie."
     echo "💡 Pensez à recharger votre terminal ou exécuter : source ~/.bashrc"
     exit 1
 fi
 
-# Alignement sur la nouvelle arborescence (Dossier partagé/template)
-SOURCE="$ZYNTHAR_ROOT/shared/template/template.c"
-DESTINATION="./$NOM_FICHIER"
+# Alignement sur l'arborescence des templates
+TEMPLATE_C="$ZYNTHAR_ROOT/shared/template/template.c"
+TEMPLATE_H="$ZYNTHAR_ROOT/shared/template/template.h"
 
-# 3. Vérification que le fichier template existe bien
-if [ ! -f "$SOURCE" ]; then
-    echo "Erreur : Le fichier template n'existe pas dans $SOURCE"
+DEST_C="./$FICHIER_C"
+DEST_H="./$FICHIER_H"
+
+# Vérification que les fichiers templates existent bien
+if [ ! -f "$TEMPLATE_C" ] || [ ! -f "$TEMPLATE_H" ]; then
+    echo "Erreur : Les fichiers templates (.c ou .h) sont introuvables dans $ZYNTHAR_ROOT/shared/template/"
     exit 1
 fi
 
-# 4. Alerte si le fichier de destination existe déjà
-if [ -f "$DESTINATION" ]; then
-    echo "Alerte : Le fichier '$NOM_FICHIER' existe déjà dans le répertoire courant. Opération annulée."
+# Alerte si l'un des fichiers de destination existe déjà
+if [ -f "$DEST_C" ] || [ -f "$DEST_H" ]; then
+    echo "Alerte : Le fichier '$FICHIER_C' ou '$FICHIER_H' existe déjà ici. Opération annulée."
     exit 1
 fi
 
-# 5. Copie du fichier
-cp "$SOURCE" "$DESTINATION"
+# Extraction de la version depuis le fichier de config JSON (via grep et cut)
+PATH_CONFIG="$ZYNTHAR_ROOT/config/zynthar_config.json"
+if [ -f "$PATH_CONFIG" ]; then
+    VERSION_PROJET=$(grep '"version"' "$PATH_CONFIG" | head -n 1 | cut -d '"' -f 4)
+else
+    VERSION_PROJET="0.1.0" # Version par défaut si le fichier n'existe pas encore
+fi
 
-# 6. Remplacement des placeholders (Date et Nom de fichier)
+# Copie des fichiers
+cp "$TEMPLATE_C" "$DEST_C"
+cp "$TEMPLATE_H" "$DEST_H"
+
+# Remplacement des placeholders
 DATE_DU_JOUR=$(date +%d/%m/%Y)
+HEADER_GUARD_NAME=$(echo "$NOM_SANS_EXT" | tr '[:lower:]' '[:upper:]')
 
-# -i permet de modifier le fichier directement (in-place)
-sed -i "s|xx/xx/xxxx|$DATE_DU_JOUR|g" "$DESTINATION"
-sed -i "s|----------|$NOM_SANS_EXT|g" "$DESTINATION"
+# Remplacements dans le fichier .c
+sed -i "s|xx/xx/xxxx|$DATE_DU_JOUR|g" "$DEST_C"
+sed -i "s|----------|$NOM_SANS_EXT|g" "$DEST_C"
+sed -i "s|v.xx|v.${VERSION_PROJET}|g" "$DEST_C"
 
-echo "Succès : '$NOM_FICHIER' a été créé avec succès dans le répertoire courant."
+# Remplacements dans le fichier .h (Gestion des Header Guards en MAJUSCULES)
+sed -i "s|xx/xx/xxxx|$DATE_DU_JOUR|g" "$DEST_H"
+sed -i "s|----------_H|${HEADER_GUARD_NAME}_H|g" "$DEST_H"
+sed -i "s|----------|$NOM_SANS_EXT|g" "$DEST_H"
+sed -i "s|v.xx|v.${VERSION_PROJET}|g" "$DEST_H"
+
+echo "Succès : Paire de fichiers créée avec succès dans le répertoire courant :"
+echo "  -> $FICHIER_C"
+echo "  -> $FICHIER_H"
