@@ -22,8 +22,6 @@
 #include <zynthar.h>
 #include "zyn_gen_png.h"
 
-// Outil de conversion d'unités (Décimètres -> Mètres)
-#define DM_TO_M(dm)  ((float)(dm) / 10.0f)
 
 /* =============================================================================
  * EXPORTATION DE LA CARTE DE RELIEF (NIVEAU DE GRIS & MASQUE TERRE/MER)
