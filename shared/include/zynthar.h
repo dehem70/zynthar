@@ -1,119 +1,58 @@
 #ifndef ZYNTHAR_H
-
 #define ZYNTHAR_H
-
-
 
 #include <stdint.h>
 
-
-
-// --- Configurations de la Base de Données ---
-
-#define ZYN_DB_EMPLACEMENT      "zyn_db/"
-
+// --- Configurations des bases de Données ---
+#define ZYN_DB_EMPLACEMENT      "data/"
 #define ZYN_DB_WORLD            "zyn-world.db"
-
-#define ZYN_DB_PLAYER          "zyn-player.db"
-
+#define ZYN_DB_PLAYER           "zyn-player.db"
 #define ZYN_DB_DELTA            "zyn-delta.db"
 
+// --- Paramètres de l'Univers de Zynthar (Alignement Voxel / Chunk Parfait) ---
+#define ZYN_WORLD_X_MAX         1000960  // Longueur : 1000.96 km (39100 Micro-Chunks)
+#define ZYN_WORLD_Z_MAX         500224   // Largeur : 500.224 km   (19540 Micro-Chunks)
+#define ZYN_WORLD_Y_MIN         -1024    // Profondeur max : -1024 m (Exactement 40 Micro-Chunks sous Y=0)
+#define ZYN_WORLD_Y_MAX         2048     // Hauteur max : +2048 m     (Exactement 80 Micro-Chunks au-dessus de Y=0)
+#define ZYN_NIV_MER             0        // Niveau de la mer = Frontière stricte de Chunk
 
+// --- Dimensions Structurelles Géométriques (Essentielles au moteur) ---
+#define ZYN_VOXEL_TO_M          0.1f     // Un voxel = 10 cm de côté
+#define ZYN_MICRO_CHUNK_DIM_VOX 256      // 256 voxels de côté (25.6m)
+#define ZYN_MICRO_CHUNK_SHIFT   8        // 2^8 = 256 (Pour les décalages de bits rapides)
+#define ZYN_MACRO_CHUNK_DIM_M   512      // 512m de côté (Exactement 20 Micro-Chunks)
 
-// --- Paramètres de l'Univers de Zynthar ---
+// --- Seuils Physiques de Déplacement (Exprimés en nombre de voxels de 10cm) ---
+#define ZYN_SEUIL_MARCHE_AUTO   4        // <= 40 cm (1 à 4 blocs)
+#define ZYN_SEUIL_SAUT          10       // 40 cm à 1 m (5 à 10 blocs)
+#define ZYN_SEUIL_ESCALADE      16       // 1 m à 1.6 m (11 à 16 blocs)
 
-#define ZYN_X_MAX              1000000  // 1000 km
-
-#define ZYN_Y_MAX              500000   // 500 km
-
-#define ZYN_Z_MIN -1000    // 1 km de profondeur
-
-#define ZYN_Z_MAX               2000     // 2 km de hauteur
-
-#define ZYN_CHUNK_MACRO_DIM     500      // 500 m
-
-#define ZYN_CHUNK_MICRO_DIM 25.6     // 25.6 m
-
-#define ZYN_VOXEL_TO_M 0.1 // 0.1 m de coté
-
-#define ZYN_NIV_MER 0
-
-
-
-/* =============================================================================
-
- * ENUMERATIONS & STRUCTURES POUR LA GENERATION MACRO (MACRO_CHUNKS)
-
- * ============================================================================= */
-
-
-
-/**
-
- * @brief Énumération des biomes macroscopiques.
-
- * Associe chaque type de environnement à un identifiant numérique unique.
-
- */
-
-typedef enum {
-
-    BIOME_INCONNU = 0,
-
-    BIOME_EAU_PROFONDE = 1,
-
-    BIOME_EAU_COTIERE = 2,
-
-    BIOME_PLAINE = 3,
-
-    BIOME_DESERT = 4,
-
-    BIOME_FORET = 5,
-
-    BIOME_TAIGA = 6,
-
-    BIOME_TOUNDRA = 7,
-
-    BIOME_JUNGLE = 8,
-
-    BIOME_GLACIER = 9,
-
-    BIOME_PLAGE = 10,
-
-    BIOME_MONTAGNE_ROCHEUSE = 11,
-
-    BIOME_PIC_ENNEIGE = 12
-
-} MacroBiome;
-
-
+// --- Identifiants Uniques des Biomes Macroscopiques (uint8_t) ---
+#define ZYN_BIOME_INCONNU           0
+#define ZYN_BIOME_EAU_PROFONDE      1
+#define ZYN_BIOME_EAU_COTIERE       2
+#define ZYN_BIOME_PLAINE            3
+#define ZYN_BIOME_DESERT            4
+#define ZYN_BIOME_FORET             5
+#define ZYN_BIOME_TAIGA             6
+#define ZYN_BIOME_TOUNDRA           7
+#define ZYN_BIOME_JUNGLE            8
+#define ZYN_BIOME_GLACIER           9
+#define ZYN_BIOME_PLAGE             10
+#define ZYN_BIOME_MONTAGNE_ROCHEUSE 11
+#define ZYN_BIOME_PIC_ENNEIGE       12
 
 /**
-
- * @brief Structure représentant la carte d'identité immuable d'un MacroChunk.
-
- * Alignée en mémoire pour faire face aux exigences de performance et de stockage SQLite3.
-
+ * @brief Structure ultra-optimisée représentant un MacroChunk.
+ * Taille totale : 12 octets.
+ * Alignement parfait à 4 octets, zéro padding invisible.
  */
-
 typedef struct {
-
-    int32_t x;               /* Coordonnée horizontale X */
-
-    int32_t y;               /* Coordonnée horizontale Y (axe longitudinal) */
-
-    float elevation_max;     /* Altitude maximale théorique (Z) */
-
-    float temperature;       /* Facteur climatique : Température Macro */
-
-    float humidity;          /* Facteur climatique : Humidité Macro */
-
-    MacroBiome biome;        /* Biome calculé selon Whittaker modifié */
-
+    int32_t chunk_x;         /* 4 octets | Coordonnée macro X */
+    int32_t chunk_z;         /* 4 octets | Coordonnée macro Z */
+    int16_t elevation_max_dm;/* 2 octets | Altitude max en décimètres (-10240 à +20480) */
+    uint8_t temperature_raw; /* 1 octet  | Température normalisée (0 à 255 -> 0% à 100%) */
+    uint8_t biome;           /* 1 octet  | ID du biome (ZYN_BIOME_*) */
 } MacroChunk;
 
-
-
-#endif // ZYNTHAR_H 
-
-
+#endif // ZYNTHAR_H
