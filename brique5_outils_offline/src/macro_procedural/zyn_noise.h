@@ -14,44 +14,44 @@
 void zyn_noise_init(uint32_t seed_value);
 
 /**
- * @brief Génère une valeur de bruit de Perlin 2D classique pour des coordonnées continues.
+ * @brief Génère une valeur de bruit de Perlin 2D classique sur le plan horizontal (X, Z).
  * @param x Coordonnée X continue (flottante).
- * @param y Coordonnée Y continue (flottante).
+ * @param z Coordonnée Z continue (flottante).
  * @return Valeur de bruit brute comprise entre -1.0 et 1.0.
  */
-float zyn_noise2d(float x, float y);
+float zyn_noise2d(float x, float z);
 
 /**
- * @brief Superpose plusieurs octaves de bruit de Perlin pour créer un effet fractal (FBM).
+ * @brief Superpose plusieurs octaves de bruit de Perlin 2D pour créer un effet fractal (FBM).
  * @param x Coordonnée X continue.
- * @param y Coordonnée Y continue.
+ * @param z Coordonnée Z continue.
  * @param octaves Nombre de couches de bruit superposées (plus d'octaves = plus de détails).
  * @param persistence Contrôle la perte d'amplitude à chaque octave (généralement 0.5).
  * @param lacunarity Contrôle le saut de fréquence à chaque octave (généralement 2.0).
- * @return Valeur de bruit fractale normalisée entre -1.0 et 1.0 (ou 0.0 et 1.0 selon traitement).
+ * @return Valeur de bruit fractale normalisée entre -1.0 et 1.0.
  */
-float zyn_fractal_noise2d(float x, float y, int32_t octaves, float persistence, float lacunarity);
+float zyn_fractal_noise2d(float x, float z, int32_t octaves, float persistence, float lacunarity);
 
 /**
- * @brief Génère une valeur de bruit de Perlin 3D classique pour des coordonnées continues.
- * @param x Coordonnée X continue.
- * @param y Coordonnée Y continue.
- * @param z Coordonnée Z continue (axe vertical/altitude).
+ * @brief Génère une valeur de bruit de Perlin 3D classique pour des coordonnées continues (X, Z, Y).
+ * @param x Coordonnée X continue (horizontale).
+ * @param z Coordonnée Z continue (horizontale).
+ * @param y Coordonnée Y continue (axe vertical / hauteur).
  * @return Valeur de densité brute comprise entre -1.0 et 1.0.
  */
-float zyn_noise3d(float x, float y, float z);
+float zyn_noise3d(float x, float z, float y);
 
 /**
  * @brief Superpose plusieurs octaves de bruit de Perlin 3D pour créer un effet fractal (FBM).
  * @param x Coordonnée X continue.
- * @param y Coordonnée Y continue.
  * @param z Coordonnée Z continue.
+ * @param y Coordonnée Y continue.
  * @param octaves Nombre de couches de bruit superposées.
  * @param persistence Contrôle la perte d'amplitude à chaque octave.
  * @param lacunarity Contrôle le saut de fréquence à chaque octave.
  * @return Valeur de densité fractale normalisée entre -1.0 et 1.0.
  */
-float zyn_fractal_noise3d(float x, float y, float z, int32_t octaves, float persistence, float lacunarity);
+float zyn_fractal_noise3d(float x, float z, float y, int32_t octaves, float persistence, float lacunarity);
 
 /* =============================================================================
  * FONCTIONS MATHÉMATIQUES EN LIGNE (INLINE) POUR LES PERFORMANCES

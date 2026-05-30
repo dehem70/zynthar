@@ -1,68 +1,66 @@
-//////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                                                                                      //
-//                                          ZYNTHAR v0.1                                                //
-//                                                                                                      //
-// Auteur : Dehem70                                                                                     //
-// Date   : 29/05/2026                                                                                  //
-//                                                                                                      //
-// zyn_gen_map_temperature  ; génération de la température sur la carte                                 //
-// utilisation :                                                                                        //
-//                                                                                                      //
-//                                                                                                      //
-//////////////////////////////////////////////////////////////////////////////////////////////////////////
+/* =============================================================================
+ *
+ * ZYNTHAR v0.1
+ *
+ * zyn_gen_map_temperature : Version Ultra-Optimisée (Branchless & Direct Pointer)
+ *
+ * =============================================================================*/
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "zyn_gen_map_temperature.h"
-#include "zyn_noise.h"
 #include <math.h>
+#include <stdint.h>
 
-void zyn_gen_map_temperature(MacroChunk* map, int32_t width, int32_t height) {
-    if (map == NULL || width <= 0 || height <= 0) return;
+#include <zynthar.h>
+#include "zyn_noise.h"
+#include "zyn_gen_map_temperature.h"
 
-    float y_centre = (float)height / 2.0f;
+#define DM_TO_M(dm)  ((float)(dm) / 10.0f)
+#define FLOAT_TO_RAW(f)  ((uint8_t)((f) * 255.0f))
 
-    /* Configuration d'un bruit climatique doux et étalé */
+void zyn_gen_map_temperature(MacroChunk* map, int32_t width_x, int32_t depth_z) {
+    if (map == NULL || width_x <= 0 || depth_z <= 0) return;
+
+    float z_centre = (float)depth_z / 2.0f;
+
     int32_t octaves = 3;
     float persistence = 0.4f;
     float lacunarity = 2.0f;
-    float scale_climat = 0.005f; /* Fréquence basse pour de grandes zones */
+    float scale_climat = 0.005f; 
     
-    /* Offsets déterministes pour séparer ce bruit de celui du relief */
     float offset_x = -850.25f;
-    float offset_y = 4120.75f;
+    float offset_z = 4120.75f;
 
-    for (int32_t y = 0; y < height; y++) {
-        /* 1. Calcul du gradient planétaire en sandwich (0.0 aux pôles, 1.0 à l'équateur) */
-        float distance_centre = fabsf((float)y - y_centre) / y_centre;
+    for (int32_t z = 0; z < depth_z; z++) {
+        float distance_centre = fabsf((float)z - z_centre) / z_centre;
         float gradient_thermique = 1.0f - distance_centre;
 
-        for (int32_t x = 0; x < width; x++) {
-            /* 2. Échantillonnage du bruit fractal continu */
-            float nx = ((float)x + offset_x) * scale_climat;
-            float ny = ((float)y + offset_y) * scale_climat;
-            float bruit_climat = zyn_fractal_noise2d(nx, ny, octaves, persistence, lacunarity);
+        int32_t offset_ligne = z * width_x;
+        float nz = ((float)z + offset_z) * scale_climat;
 
-            /* 3. Fusion : Le gradient est perturbé à hauteur de 20% par le bruit */
+        /* [OPTI] Accès RAM Direct : On pointe directement sur le premier élément de la ligne */
+        MacroChunk* chunk = &map[offset_ligne];
+
+        for (int32_t x = 0; x < width_x; x++) {
+            float nx = ((float)x + offset_x) * scale_climat;
+            float bruit_climat = zyn_fractal_noise2d(nx, nz, octaves, persistence, lacunarity);
+
             float temp_brute = gradient_thermique + (bruit_climat * 0.20f);
 
-            /* 3b. Influence de l'altitude : plus on est haut, plus il fait froid */
-            int32_t index = y * width + x;
-            float altitude = map[index].elevation_max;
-            if (altitude > 0.0f) {
-            	/* Coefficient de 0.4f : les hautes montagnes seront très froides */
-                temp_brute -= (altitude * 0.40f); 
-            }
+            /* [OPTI] Branchless : On extrait l'altitude et on applique fmaxf pour éliminer le "if" */
+            float altitude_m = DM_TO_M(chunk->elevation_max_dm);
+            temp_brute -= (fmaxf(0.0f, altitude_m) * 0.0004f); 
 
-            /* 4. Clamping de sécurité strict entre [0.0f, 1.0f] */
-            temp_brute = fmaxf(-1.0f, fminf(temp_brute, 1.0f));
+            /* Clamping de sécurité */
+            if (temp_brute < 0.0f) temp_brute = 0.0f;
+            if (temp_brute > 1.0f) temp_brute = 1.0f;
             
-            /* 5. Écriture directe in-place dans la grille */
-            map[index].temperature = temp_brute;
+            /* Écriture directe via le pointeur */
+            chunk->temperature_raw = FLOAT_TO_RAW(temp_brute);
+
+            /* [OPTI] Glissement vers la case mémoire suivante (très efficace pour le cache L1/L2) */
+            chunk++;
         }
     }
 }
-
-

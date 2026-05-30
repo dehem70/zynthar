@@ -1,21 +1,25 @@
-//////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                                                                                      //
-//                                          ZYNTHAR v0.1                                                //
-//                                                                                                      //
-// Auteur : Dehem70                                                                                     //
-// Date   : 28/05/2026                                                                                  //
-//                                                                                                      //
-// zyn_noise   ; INTERFACE DU MOTEUR MATHÉMATIQUE DE BRUIT PROCÉDURAL (2D & 3D)                         //
-//                                                                                                      //
-//////////////////////////////////////////////////////////////////////////////////////////////////////////
+/* =============================================================================
+ *
+ * ZYNTHAR v0.1
+ *
+ * Auteur : Dehem70
+ * Date   : 28/05/2026
+ *
+ * zyn_noise : Moteur de génération mathématique de bruit procédural (2D & 3D)
+ * Adapté aux axes 3D Babylon.js (X, Z: Horizontal, Y: Vertical)
+ *
+ * =============================================================================*/
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "zyn_noise.h"
 #include <math.h>
+#include <stdint.h>
 
-/* Table de permutation interne (taille 512 pour éviter les modulos dans les index imbriqués) */
+#include <zynthar.h>
+#include "zyn_noise.h"
+
+/* Table de permutation interne (taille 512 pour éliminer les modulos lents dans les index) */
 static uint8_t p[512];
 
 /* =============================================================================
@@ -24,31 +28,27 @@ static uint8_t p[512];
 
 /**
  * @brief Calcule le produit scalaire entre un gradient pseudo-aléatoire 2D et la distance.
- * (Version 4 directions issue de ta maquette Python)
  */
-static inline float zyn_grad2d(uint8_t hash, float x, float y) {
-    switch (hash & 3) {
-        case 0:  return  x + y;
-        case 1:  return -x + y;
-        case 2:  return  x - y;
-        case 3:  return -x - y;
-        default: return 0.0f; /* Évite les avertissements du compilateur */
-    }
+static inline float zyn_grad2d(uint8_t hash, float x, float z) {
+// bit 0 détermine le signe de x, bit 1 détermine le signe de z
+    float u = (hash & 1) ? -x : x;
+    float v = (hash & 2) ? -z : z;
+    return u + v;
 }
 
 /**
  * @brief Calcule le produit scalaire pour le bruit 3D.
- * Utilise les 12 vecteurs gradients pointant vers les arêtes d'un cube pour éviter les artefacts.
+ * Utilise les 12 arêtes du cube. Axe Y réaligné en position verticale.
  */
-static inline float zyn_grad3d(uint8_t hash, float x, float y, float z) {
+static inline float zyn_grad3d(uint8_t hash, float x, float z, float y) {
     int h = hash & 15;
-    float u = h < 8 ? x : y;
-    float v = h < 4 ? y : (h == 12 || h == 14 ? x : z);
-    return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
+    float u = (h < 8) ? x : z;
+    float v = (h < 4) ? z : ((h == 12 || h == 14) ? x : y);
+    return ((h & 1) ? -u : u) + ((h & 2) ? -v : v);
 }
 
 /* =============================================================================
- * ENTRÉE DE L'INTERFACE : INITIALISATION DE LA SEED
+ * ENTRÉE DE L'INTERFACE : INITIALISATION DE LA GRAINE (SEED)
  * ============================================================================= */
 
 void zyn_noise_init(uint32_t seed_value) {
@@ -58,7 +58,7 @@ void zyn_noise_init(uint32_t seed_value) {
         base_p[i] = (uint8_t)i;
     }
 
-    /* Générateur pseudo-aléatoire déterministe (LCG) pour mélanger la table */
+    /* Générateur pseudo-aléatoire déterministe (LCG) pour le shuffle de la table */
     uint32_t next_random = seed_value;
     for (int32_t i = 255; i > 0; i--) {
         next_random = next_random * 1103515245 + 12345;
@@ -70,79 +70,79 @@ void zyn_noise_init(uint32_t seed_value) {
         base_p[target_index] = temp;
     }
 
-    /* Duplication de la table sur les 512 entrées pour sécuriser les accès indexés */
+    /* Duplication de la table pour sécuriser les accès indexés sans dépassement */
     for (int32_t i = 0; i < 512; i++) {
         p[i] = base_p[i & 255];
     }
 }
 
 /* =============================================================================
- * GENERATEURS DE BRUIT DE BASE (2D & 3D)
+ * GENERATEURS DE BRUIT DE BASE (2D & 3D ALIGNÉS SQUELETTE)
  * ============================================================================= */
 
-float zyn_noise2d(float x, float y) {
+float zyn_noise2d(float x, float z) {
     /* Détermination des coordonnées de la cellule virtuelle encapsulante */
-    int32_t X = ((int32_t)floorf(x)) & 255;
-    int32_t Y = ((int32_t)floorf(y)) & 255;
+    uint8_t X = (uint8_t)(int32_t)floorf(x);
+    uint8_t Z = (uint8_t)(int32_t)floorf(z);
 
     /* Calcul des coordonnées relatives/fractionnaires dans la cellule */
     float xf = x - floorf(x);
-    float yf = y - floorf(y);
+    float zf = z - floorf(z);
 
     /* Application du lissage de Perlin (courbe en S) */
     float u = zyn_fade(xf);
-    float v = zyn_fade(yf);
+    float v = zyn_fade(zf);
 
-    /* Récupération des signatures de hachage des 4 coins du carré */
-    uint8_t aa = p[p[X] + Y];
-    uint8_t ab = p[p[X] + Y + 1];
-    uint8_t ba = p[p[X + 1] + Y];
-    uint8_t bb = p[p[X + 1] + Y + 1];
+    /* Récupération des signatures de hachage des 4 coins du carré horizontal */
+    uint8_t aa = p[p[X] + Z];
+    uint8_t ab = p[p[X] + Z + 1];
+    uint8_t ba = p[p[X + 1] + Z];
+    uint8_t bb = p[p[X + 1] + Z + 1];
 
     /* Interpolations successives des produits scalaires des gradients */
     float res = zyn_lerp(
-        zyn_lerp(zyn_grad2d(aa, xf, yf),         zyn_grad2d(ba, xf - 1.0f, yf), u),
-        zyn_lerp(zyn_grad2d(ab, xf, yf - 1.0f),  zyn_grad2d(bb, xf - 1.0f, yf - 1.0f), u),
+        zyn_lerp(zyn_grad2d(aa, xf, zf),         zyn_grad2d(ba, xf - 1.0f, zf), u),
+        zyn_lerp(zyn_grad2d(ab, xf, zf - 1.0f),  zyn_grad2d(bb, xf - 1.0f, zf - 1.0f), u),
         v
     );
 
     return res;
 }
 
-float zyn_noise3d(float x, float y, float z) {
-    /* Cellule virtuelle 3D encapsulante */
-    int32_t X = ((int32_t)floorf(x)) & 255;
-    int32_t Y = ((int32_t)floorf(y)) & 255;
-    int32_t Z = ((int32_t)floorf(z)) & 255;
-
+float zyn_noise3d(float x, float z, float y) {
+    /* Cellule virtuelle 3D encapsulante réalignée (Y est la hauteur) */
+    uint8_t X = (uint8_t)(int32_t)floorf(x);
+    uint8_t Z = (uint8_t)(int32_t)floorf(z);
+    uint8_t Y = (uint8_t)(int32_t)floorf(y);
+    
     /* Coordonnées fractionnaires dans le cube */
     float xf = x - floorf(x);
-    float yf = y - floorf(y);
     float zf = z - floorf(z);
+    float yf = y - floorf(y);
 
     /* Facteurs de lissage */
     float u = zyn_fade(xf);
-    float v = zyn_fade(yf);
-    float w = zyn_fade(zf);
+    float v = zyn_fade(zf);
+    float w = zyn_fade(yf);
 
     /* Hachage des 8 sommets du cube */
-    int32_t A  = p[X] + Y;
-    uint8_t aa = p[A] + Z;
-    uint8_t ab = p[A + 1] + Z;
-    int32_t B  = p[X + 1] + Y;
-    uint8_t ba = p[B] + Z;
-    uint8_t bb = p[B + 1] + Z;
+    int32_t A  = p[X] + Z;
+    uint8_t aa = p[A] + Y;
+    uint8_t ab = p[A + 1] + Y;
+    int32_t B  = p[X + 1] + Z;
+    uint8_t ba = p[B] + Y;
+    uint8_t bb = p[B + 1] + Y;
 
-    /* Triple interpolation linéaire (Trilinear interpolation) */
+    /* Triple interpolation linéaire tridimensionnelle */
     return zyn_lerp(
         zyn_lerp(
-            zyn_lerp(zyn_grad3d(p[aa], xf, yf, zf),          zyn_grad3d(p[ba], xf - 1.0f, yf, zf), u),
-            zyn_lerp(zyn_grad3d(p[ab], xf, yf - 1.0f, zf),   zyn_grad3d(p[bb], xf - 1.0f, yf - 1.0f, zf), u),
+            zyn_lerp(zyn_grad3d(p[aa], xf, zf, yf),          zyn_grad3d(p[ba], xf - 1.0f, zf, yf), u),
+            zyn_lerp(zyn_grad3d(p[ab], xf, zf - 1.0f, yf),   zyn_grad3d(p[bb], xf - 1.0f, zf - 1.0f, yf), u),
             v
         ),
         zyn_lerp(
-            zyn_lerp(zyn_grad3d(p[aa + 1], xf, yf, zf - 1.0f),         zyn_grad3d(p[ba + 1], xf - 1.0f, yf, zf - 1.0f), u),
-            zyn_lerp(zyn_grad3d(p[ab + 1], xf, yf - 1.0f, zf - 1.0f),  zyn_grad3d(p[bb + 1], xf - 1.0f, yf - 1.0f, zf - 1.0f), u),
+            zyn_lerp(zyn_grad3d(p[aa + 1], xf, zf, yf - 1.0f),          zyn_grad3d(p[ba + 1], xf - 1.0f, zf, yf - 1.0f), u),
+            zyn_lerp(zyn_grad3d(p[ab + 1], xf, zf - 1.0f, yf - 1.0f),   zyn_grad3d(p[bb + 1], xf - 1.0f, zf - 1.0f, yf - 1.0f), u),
             v
         ),
         w
@@ -153,14 +153,14 @@ float zyn_noise3d(float x, float y, float z) {
  * ALGORITHMES FRACTALS (FBM) SUPERPOSANT LES OCTAVES
  * ============================================================================= */
 
-float zyn_fractal_noise2d(float x, float y, int32_t octaves, float persistence, float lacunarity) {
+float zyn_fractal_noise2d(float x, float z, int32_t octaves, float persistence, float lacunarity) {
     float total = 0.0f;
     float amplitude = 1.0f;
     float frequence = 1.0f;
     float max_amplitude = 0.0f;
 
     for (int32_t i = 0; i < octaves; i++) {
-        total += zyn_noise2d(x * frequence, y * frequence) * amplitude;
+        total += zyn_noise2d(x * frequence, z * frequence) * amplitude;
         max_amplitude += amplitude;
         amplitude *= persistence;
         frequence *= lacunarity;
@@ -169,14 +169,14 @@ float zyn_fractal_noise2d(float x, float y, int32_t octaves, float persistence, 
     return total / max_amplitude;
 }
 
-float zyn_fractal_noise3d(float x, float y, float z, int32_t octaves, float persistence, float lacunarity) {
+float zyn_fractal_noise3d(float x, float z, float y, int32_t octaves, float persistence, float lacunarity) {
     float total = 0.0f;
     float amplitude = 1.0f;
     float frequence = 1.0f;
     float max_amplitude = 0.0f;
 
     for (int32_t i = 0; i < octaves; i++) {
-        total += zyn_noise3d(x * frequence, y * frequence, z * frequence) * amplitude;
+        total += zyn_noise3d(x * frequence, z * frequence, y * frequence) * amplitude;
         max_amplitude += amplitude;
         amplitude *= persistence;
         frequence *= lacunarity;

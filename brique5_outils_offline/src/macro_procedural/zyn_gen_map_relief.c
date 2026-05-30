@@ -1,45 +1,52 @@
-//////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                                                                                      //
-//                                          ZYNTHAR v0.1                                                //
-//                                                                                                      //
-// Auteur : Dehem70                                                                                     //
-// Date   : 28/05/2026                                                                                  //
-//                                                                                                      //
-// zyn_gen_map_relief  ; génération de la carte macro du relief                                         //
-//                                                                                                      //
-//////////////////////////////////////////////////////////////////////////////////////////////////////////
+/* =============================================================================
+ *
+ * ZYNTHAR v0.1
+ *
+ * Auteur : Dehem70
+ * Date   : 28/05/2026
+ *
+ * zyn_gen_map_relief : Génération procédurale du relief de la carte macro
+ * Intègre les masques de Voronoi, le bruit fractal et un automate cellulaire.
+ * Aligné sur l'axe horizontal longitudinal Z et le stockage packagé (décimètres).
+ *
+ * =============================================================================*/
 
-#include "zyn_gen_map_relief.h"
-#include "zyn_noise.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
+#include <stdint.h>
 
-/* Structure interne locale pour stocker les positions des germes d'îles */
+#include <zynthar.h>
+#include "zyn_noise.h"
+#include "zyn_gen_map_relief.h"
+
+// Outils de conversion d'unités (Mètres <-> Décimètres)
+#define M_TO_DM(m)   ((int16_t)((m) * 10.0f))
+#define DM_TO_M(dm)  ((float)(dm) / 10.0f)
+
+/* Structure interne locale pour stocker les positions des germes d'îles (Plan horizontal X/Z) */
 typedef struct {
     float x;
-    float y;
+    float z;
 } IslandSeed;
 
 /* =============================================================================
  * GESTION DE LA MÉMOIRE (ALLOCATION CONTIGUË)
  * ============================================================================= */
 
-MacroChunk* zyn_gen_map_relief_alloc(int32_t width, int32_t height) {
-    /* Validation de sécurité sur les dimensions */
-    if (width <= 0 || height <= 0) {
-        fprintf(stderr, "[ERREUR] Dimensions d'allocation invalides : %dx%d\n", width, height);
+MacroChunk* zyn_gen_map_relief_alloc(int32_t width_x, int32_t depth_z) {
+    /* Validation de sécurité sur les dimensions de l'univers macro */
+    if (width_x <= 0 || depth_z <= 0) {
+        fprintf(stderr, "[ERREUR] Dimensions d'allocation invalides : %dx%d\n", width_x, depth_z);
         return NULL;
     }
 
-    /* Calcul du nombre total de MacroChunks à allouer */
-    size_t total_chunks = (size_t)width * (size_t)height;
+    /* Calcul du nombre total de MacroChunks à allouer sur la grille horizontale */
+    size_t total_chunks = (size_t)width_x * (size_t)depth_z;
 
-    /* Allocation d'un bloc unique et mise à zéro de la mémoire (calloc)
-       Toutes les cases prendront par défaut la valeur 0 (et donc BIOME_INCONNU) */
+    /* Allocation d'un bloc unique et initialisation à zéro (calloc) */
     MacroChunk* map = (MacroChunk*)calloc(total_chunks, sizeof(MacroChunk));
-
     if (map == NULL) {
         fprintf(stderr, "[ERREUR] Échec de l'allocation mémoire pour la carte macro (%zu éléments).\n", total_chunks);
         return NULL;
@@ -58,59 +65,58 @@ void zyn_gen_map_relief_free(MacroChunk* map) {
  * GENERATION DU MASQUE DE VORONOI
  * ============================================================================= */
 
-void zyn_gen_map_relief_voronoi(MacroChunk* map, int32_t width, int32_t height, int32_t num_islands) {
-    if (map == NULL || width <= 0 || height <= 0 || num_islands <= 0) return;
-
-    /* Allocation d'un tableau de germes sur la pile (stack) pour une vitesse maximale */
+float* zyn_gen_map_relief_voronoi(int32_t width_x, int32_t depth_z, int32_t num_islands) {
+    
+    size_t total_cases = (size_t)width_x * (size_t)depth_z;
+    
+    // Conteneur temporaire Haute-Fidélité
+    float* masque_voronoi = (float*)malloc(total_cases * sizeof(float));
+    if (masque_voronoi == NULL) return NULL;
+    
+    /* Allocation d'un tableau de germes sur le tas pour éviter de saturer la pile */
     IslandSeed* seeds = (IslandSeed*)malloc(sizeof(IslandSeed) * num_islands);
-    if (seeds == NULL) return;
+    if (seeds == NULL) {
+        // [CORRECTION] Libération du premier buffer et retour de NULL 
+        free(masque_voronoi);
+        return NULL;
+    }
 
-    /* Utilisation d'un mini-générateur déterministe local pour placer les îles */
+    /* Utilisation d'un mini-générateur déterministe local (LCG) pour placer les îles */
     uint32_t lcg_state = 54321U; 
     for (int32_t i = 0; i < num_islands; i++) {
-        /* Calcul de X aléatoire entre 0 et width */
         lcg_state = lcg_state * 1103515245 + 12345;
-        seeds[i].x = (float)(lcg_state % width);
+        seeds[i].x = (float)(lcg_state % width_x);
 
-        /* Calcul de Y aléatoire entre 0 et height */
         lcg_state = lcg_state * 1103515245 + 12345;
-        seeds[i].y = (float)(lcg_state % height);
+        seeds[i].z = (float)(lcg_state % depth_z);
     }
 
     /* Définition du rayon d'action maximal théorique d'une île */
-    float max_dist = (width < height ? width : height) / 3.5f; 
+    float max_dist = (width_x < depth_z ? width_x : depth_z) / 3.5f; 
 
-    /* Parcours de l'intégralité de la grille plate */
-    for (int32_t y = 0; y < height; y++) {
-        for (int32_t x = 0; x < width; x++) {
-            float min_dist = 999999.0f;
+    for (int32_t z = 0; z < depth_z; z++) {
+        for (int32_t x = 0; x < width_x; x++) {
+            float min_dist_carre = 99999999.0f;
 
-            /* Recherche de la graine d'île la plus proche pour ce pixel macro */
             for (int32_t i = 0; i < num_islands; i++) {
                 float dx = seeds[i].x - (float)x;
-                float dy = seeds[i].y - (float)y;
-                /* On calcule la distance Euclidienne brute */
-                float dist = sqrtf(dx * dx + dy * dy);
-
-                if (dist < min_dist) {
-                    min_dist = dist;
-                }
+                float dz = seeds[i].z - (float)z;
+                float dist_carre = (dx * dx) + (dz * dz);
+                if (dist_carre < min_dist_carre) min_dist_carre = dist_carre;
             }
 
-            /* Calcul de l'atténuation linéaire (1.0 au centre, 0.0 à la périphérie) */
+            float min_dist = sqrtf(min_dist_carre);
             float val = 1.0f - (min_dist / max_dist);
             if (val < 0.0f) val = 0.0f;
 
-            /* Stockage temporaire du masque dans l'élévation */
-            int32_t index = y * width + x;
-            map[index].elevation_max = val;
+            // Écriture directe en float pur [0.0f, 1.0f] : Zéro perte de précision !
+            int32_t index = z * width_x + x;
+            masque_voronoi[index] = val;
         }
     }
 
-    /* Libération du tableau temporaire des germes */
-    free(seeds);
+    return masque_voronoi; // On passe le conteneur à la fonction suivante
 }
-
 
 /* =============================================================================
  * UTILITAIRE DE COMPARAISON POUR LE TRI (QSORT)
@@ -126,157 +132,198 @@ static int comparer_floats(const void* a, const void* b) {
 /* =============================================================================
  * FUSION DU RELIEF & CALIBRAGE DU NIVEAU DE LA MER
  * ============================================================================= */
+void zyn_gen_map_relief_archipelago(MacroChunk* map, int32_t width_x, int32_t depth_z, int32_t num_islands, float max_sea_percentage) {
+    if (map == NULL || width_x <= 0 || depth_z <= 0) return;
 
-void zyn_gen_map_relief_archipelago(MacroChunk* map, int32_t width, int32_t height, int32_t num_islands, float max_sea_percentage) {
-    if (map == NULL || width <= 0 || height <= 0) return;
+    // 1. Récupération du conteneur temporaire Voronoi en haute résolution
+    float* masque_voronoi = zyn_gen_map_relief_voronoi(width_x, depth_z, num_islands);
+    if (masque_voronoi == NULL) return;
 
-    /* 1. On s'assure d'abord que le masque de Voronoi est bien calculé dans la grille */
-    zyn_gen_map_relief_voronoi(map, width, height, num_islands);
-
-    size_t total_cases = (size_t)width * (size_t)height;
-
-    /* 2. Allocation d'un tableau plat temporaire pour stocker et trier toutes les hauteurs */
+    size_t total_cases = (size_t)width_x * (size_t)depth_z;
     float* hauteurs_triees = (float*)malloc(total_cases * sizeof(float));
+    
     if (hauteurs_triees == NULL) return;
 
-    /* Configurations des octaves du bruit */
     int32_t octaves = 5;
-    float persistence = 0.5f;
-    float lacunarity = 2.0f;
+    float persistence = 0.54f;
+    float lacunarity = 2.1f;
+    float base_scale = 0.006f;
     
-    /* Échelle et offsets arbitraires déterministes pour le bruit de relief */
-    float base_scale = 0.004f;
     float offset_x = 1250.5f;
-    float offset_y = -4580.2f;
+    float offset_z = -4580.2f;
 
-    float intensite_ile = 1.2f;
-    float niveau_mer_base = 0.7f;
+    float warp_scale = 0.002f;
+    float warp_intensity = 40.0f;
 
-    /* 3. Premier parcours : Calcul et fusion des reliefs bruts */
-    for (int32_t y = 0; y < height; y++) {
-        for (int32_t x = 0; x < width; x++) {
-            size_t index = (size_t)y * width + x;
+    /* 2. Premier parcours : Fusion mathématique 100% Floats */
+    for (int32_t z = 0; z < depth_z; z++) {
+        for (int32_t x = 0; x < width_x; x++) {
+            size_t index = (size_t)z * width_x + x;
 
-            /* Récupération du masque de Voronoi stocké temporairement dans l'élévation */
-            float masque_voronoi = map[index].elevation_max;
+            // Calcul du Domain Warping spatiale
+            float warp_dx = zyn_noise2d(((float)x + 500.0f) * 0.002f, ((float)z - 300.0f) * 0.002f) * 40.0f;
+            float warp_dz = zyn_noise2d(((float)x - 200.0f) * 0.002f, ((float)z + 800.0f) * 0.002f) * 40.0f;
 
-            /* Calcul du bruit fractal continu */
-            float nx = ((float)x + offset_x) * base_scale;
-            float ny = ((float)y + offset_y) * base_scale;
-            float relief_fractal = zyn_fractal_noise2d(nx, ny, octaves, persistence, lacunarity);
+            float nx = ((float)x + warp_dx + offset_x) * base_scale;
+            float nz = ((float)z + warp_dz + offset_z) * base_scale;
+            float relief_fractal = zyn_fractal_noise2d(nx, nz, octaves, persistence, lacunarity);
+            
+            // 1. Ton bruit fractal global standard
+            float bruit_global = zyn_fractal_noise2d(nx, nz, octaves, persistence, lacunarity);
 
-            /* Formule de fusion mathématique */
-            float relief_brut = relief_fractal + (masque_voronoi * intensite_ile) - niveau_mer_base;
+            // 2. Récupération du Voronoi pur
+            float v_mask = masque_voronoi[index];
+            float v_mask_accentue = v_mask * v_mask;
 
-            /* Sauvegarde dans le tableau de tri et mise à jour temporaire de la carte */
+            // 3. L'inverse du Voronoi pour cibler la pleine mer
+            float zone_oceanique = 1.0f - v_mask;
+
+            // 4. FUSION DYNAMIQUE :
+            // - Le Voronoi (v_mask_accentue * 1.4f) pousse les îles vers le haut (+2000m)
+            // - L'océan (zone_oceanique * -0.8f) creuse activement les fosses vers le bas (-1000m)
+            // - Le bruit apporte la rugosité partout sans être annulé.
+            float relief_brut = (bruit_global * 0.5f) + (v_mask_accentue * 1.4f) - (zone_oceanique * 0.8f);
+
             hauteurs_triees[index] = relief_brut;
-            map[index].elevation_max = relief_brut;
         }
     }
 
+    // Le masque de Voronoi a été entièrement consommé sans jamais avoir été altéré,
+    // on peut libérer le conteneur immédiatement pour libérer la RAM !
+    free(masque_voronoi); 
 
-    /* 4. Tri rapide (QuickSort) de l'ensemble des hauteurs de l'univers */
-    qsort(hauteurs_triees, total_cases, sizeof(float), comparer_floats);
+    /* 3. Tri rapide (QuickSort) sur les floats de haute précision */
+    // On duplique temporairement le tableau pour le trier sans perdre l'ordre géographique de hauteurs_triees
+    float* copie_pour_tri = (float*)malloc(total_cases * sizeof(float));
+    if (copie_pour_tri == NULL) {
+        free(hauteurs_triees);
+        return;
+    }
+    memcpy(copie_pour_tri, hauteurs_triees, total_cases * sizeof(float));
 
-    /* 5. Identification de la valeur pivot correspondant au ratio de mer recherché */
+    qsort(copie_pour_tri, total_cases, sizeof(float), comparer_floats);
+
+    /* 4. Identification du pivot sur le tableau trié */
     size_t index_mer = (size_t)(total_cases * max_sea_percentage);
     if (index_mer >= total_cases) index_mer = total_cases - 1;
-    float niveau_mer_calcule = hauteurs_triees[index_mer];
+    float niveau_mer_calcule = copie_pour_tri[index_mer];
+    free(copie_pour_tri); // Plus besoin
 
-    /* 6. Second parcours : Ajustement final de la hauteur par rapport au pivot */
+    /* =========================================================================
+     * ÉTAPE 5 : RECHERCHE DES EXTRÊMES ABSOLUS EN HAUTE PRÉCISION
+     * ========================================================================= */
+    float max_brut_terre = 0.0001f; // Évite la division par zéro si la carte est plate
+    float min_brut_mer   = -0.0001f;
+
     for (size_t i = 0; i < total_cases; i++) {
-        float alt_brute = map[i].elevation_max - niveau_mer_calcule;
-        map[i].elevation_max = fmaxf(-1.0f, fminf(alt_brute, 1.0f));
-
-        /* Injection des coordonnées géographiques réelles dans la structure */
-        map[i].x = (int32_t)(i % width);
-        map[i].y = (int32_t)(i / width);
+        float alt_relative = hauteurs_triees[i] - niveau_mer_calcule;
+        
+        if (alt_relative > 0.0f && alt_relative > max_brut_terre) {
+            max_brut_terre = alt_relative;
+        }
+        if (alt_relative < 0.0f && alt_relative < min_brut_mer) {
+            min_brut_mer = alt_relative;
+        }
     }
 
-    /* Libération de la mémoire du tableau de tri */
+    /* CALCUL DES COEFFICIENTS LINÉAIRES DE CORRECTION ASYMÉTRIQUE */
+    float coef_positif = ZYN_WORLD_Y_MAX / max_brut_terre;
+    float coef_negatif = ZYN_WORLD_Y_MIN / min_brut_mer; // Négatif / Négatif = Ratio positif
+
+    /* =========================================================================
+     * ÉTAPE 6 : ÉTALEMENT PAR MORCEAUX ET UNIQUE COMPRESSION FINALE
+     * ========================================================================= */
+    for (size_t i = 0; i < total_cases; i++) {
+        float alt_relative = hauteurs_triees[i] - niveau_mer_calcule;
+        float alt_finale_m = 0.0f;
+
+        /* Application du coefficient linéaire dédié selon le domaine */
+        if (alt_relative > 0.0f) {
+            alt_finale_m = alt_relative * coef_positif;
+        } else if (alt_relative < 0.0f) {
+            alt_finale_m = alt_relative * coef_negatif;
+        }
+
+        // Bornage de sécurité physique ultime de ton architecture
+        float alt_clamped_m = fmaxf(ZYN_WORLD_Y_MIN, fminf(alt_finale_m, ZYN_WORLD_Y_MAX));
+
+        /* L'unique arrondi de la chaîne : passage au type de stockage int16_t en dm */
+        map[i].elevation_max_dm = (int16_t)roundf(alt_clamped_m * 10.0f);
+        map[i].chunk_x = (int32_t)(i % width_x);
+        map[i].chunk_z = (int32_t)(i / width_x);
+    }
+
     free(hauteurs_triees);
 }
-
-
 /* =============================================================================
  * LISSAGE DES CÔTES PAR AUTOMATE CELLULAIRE (VOISINAGE DE MOORE)
  * ============================================================================= */
 
-void zyn_gen_map_relief_smooth_coastlines(MacroChunk* map, int32_t width, int32_t height, int32_t iterations) {
-    if (map == NULL || width <= 0 || height <= 0 || iterations <= 0) return;
+void zyn_gen_map_relief_smooth_coastlines(MacroChunk* map, int32_t width_x, int32_t depth_z, int32_t iterations) {
+    if (map == NULL || width_x <= 0 || depth_z <= 0 || iterations <= 0) return;
 
-    size_t total_cases = (size_t)width * (size_t)height;
+    size_t total_cases = (size_t)width_x * (size_t)depth_z;
 
-    /* 1. Allocation du buffer de masque temporaire (1 octet par case = ultra léger) */
+    /* 1. Allocation des buffers de masques binaires (1 octet par case = ultra léger pour le CPU) */
     uint8_t* grille_binaire = (uint8_t*)malloc(total_cases * sizeof(uint8_t));
     if (grille_binaire == NULL) return;
 
-    /* 2. Initialisation du masque binaire : 1 pour la terre (> 0), 0 pour l'eau (<= 0) */
+    /* Initialisation : 1 pour la terre ferme (altitude positive), 0 pour la mer */
     for (size_t i = 0; i < total_cases; i++) {
-        grille_binaire[i] = (map[i].elevation_max > 0.0f) ? 1 : 0;
+        grille_binaire[i] = (map[i].elevation_max_dm > 0) ? 1 : 0;
     }
 
-    /* Allocation d'un second buffer pour appliquer les règles de transition sans conflit */
     uint8_t* nouvelle_grille = (uint8_t*)malloc(total_cases * sizeof(uint8_t));
     if (nouvelle_grille == NULL) {
         free(grille_binaire);
         return;
     }
-    /* Copie de base pour garder les bordures intactes */
     memcpy(nouvelle_grille, grille_binaire, total_cases);
 
-    /* 3. Boucle principale de l'automate cellulaire */
+    /* 2. Boucle principale de l'automate cellulaire */
     for (int32_t iter = 0; iter < iterations; iter++) {
         
-        /* On ignore les bordures extérieures (1 pixel de marge) pour éviter les débordements mémoire */
-        for (int32_t y = 1; y < height - 1; y++) {
-            for (int32_t x = 1; x < width - 1; x++) {
-                int32_t voisins_terre = 0;
+        /* On ignore les bordures extérieures pour éliminer tout risque de débordement mémoire */
+        for (int32_t z = 1; z < depth_z - 1; z++) {
+            // Pré-calcul de l'index de ligne pour économiser des multiplications lourdes
+            int32_t offset_ligne = z * width_x;
+            int32_t haut = offset_ligne - width_x;
+            int32_t bas = offset_ligne + width_x;
 
-                /* Comptage des 8 voisins de Moore autour de la case (x, y) */
-                for (int32_t dy = -1; dy <= 1; dy++) {
-                    for (int32_t dx = -1; dx <= 1; dx++) {
-                        if (dx == 0 && dy == 0) continue; /* On ne se compte pas soi-même */
+            for (int32_t x = 1; x < width_x - 1; x++) {
+                /* Déroulage complet du voisinage de Moore (Aucune boucle dx/dz, accès RAM direct) */
+                int32_t voisins_terre = 
+                    grille_binaire[haut + x - 1] + grille_binaire[haut + x] + grille_binaire[haut + x + 1] +
+                    grille_binaire[offset_ligne + x - 1]                   + grille_binaire[offset_ligne + x + 1] +
+                    grille_binaire[bas + x - 1]  + grille_binaire[bas + x]  + grille_binaire[bas + x + 1];
 
-                        int32_t nx = x + dx;
-                        int32_t ny = y + dy;
-                        if (grille_binaire[ny * width + nx] == 1) {
-                            voisins_terre++;
-                        }
-                    }
-                }
-
-                int32_t index_actuel = y * width + x;
+                int32_t index_actuel = offset_ligne + x;
                 
-                /* Application des règles de transition de ta maquette Python */
                 if (grille_binaire[index_actuel] == 1 && voisins_terre < 4) {
-                    nouvelle_grille[index_actuel] = 0; /* Érosion : la terre isolée devient de l'eau */
+                    nouvelle_grille[index_actuel] = 0; 
                 } else if (grille_binaire[index_actuel] == 0 && voisins_terre >= 5) {
-                    nouvelle_grille[index_actuel] = 1; /* Comblement : l'eau isolée devient de la terre */
+                    nouvelle_grille[index_actuel] = 1; 
                 } else {
-                    nouvelle_grille[index_actuel] = grille_binaire[index_actuel]; /* Statu quo */
+                    nouvelle_grille[index_actuel] = grille_binaire[index_actuel];
                 }
             }
         }
-
-        /* Mise à jour du buffer de référence pour la prochaine itération */
         memcpy(grille_binaire, nouvelle_grille, total_cases);
     }
 
-    /* 4. Réapplication du masque lissé sur les altitudes de la carte */
+    /* 3. Réapplication du masque lissé sur les altitudes compressées (décimètres) */
     for (size_t i = 0; i < total_cases; i++) {
-        float alt = map[i].elevation_max;
+        int16_t alt_dm = map[i].elevation_max_dm;
 
         if (grille_binaire[i] == 1) {
-            /* C'est de la terre ferme : on s'assure que l'altitude est strictement positive */
-            map[i].elevation_max = (alt > 0.0f) ? alt : fabsf(alt) + 0.01f;
+            /* C'est de la terre ferme : on garantit une altitude strictement positive (min 1 décimètre = 10cm) */
+            map[i].elevation_max_dm = (alt_dm > 0) ? alt_dm : abs(alt_dm) + 1;
         } else {
-            /* C'est de l'eau : on s'assure que l'altitude est négative ou nulle */
-            map[i].elevation_max = (alt < 0.0f) ? alt : -fabsf(alt) - 0.01f;
+            /* C'est de l'eau : on garantit une altitude négative ou nulle (max -1 décimètre = -10cm) */
+            map[i].elevation_max_dm = (alt_dm < 0) ? alt_dm : -abs(alt_dm) - 1;
         }
     }
 
-    /* Libération de la mémoire des buffers d'automate */
     free(grille_binaire);
     free(nouvelle_grille);
 }

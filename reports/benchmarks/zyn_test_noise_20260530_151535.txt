@@ -1,0 +1,20 @@
+=====================================================================
+         ZYNTHAR : RAPPORT DE TEST & BENCHMARK (zyn_noise)           
+=====================================================================
+ Fichier généré : zyn_test_noise_20260530_151535.txt
+ Chemin absolu  : /home/dehem/Dev/zynthar/reports/benchmarks/zyn_test_noise_20260530_151535.txt
+=====================================================================
+
+[1/2] Lancement des tests de non-régression...
+  [SUCCÈS] Tous les tests de non-régression sont au vert. Le moteur est stable.
+
+[2/2] Lancement du benchmark de stress-test (10000000 itérations)...
+  Stressing zyn_noise2d... Terminé en 0.0813 secondes.
+  -> Vitesse 2D : 123.02 Millions d'appels/sec
+
+  Stressing zyn_noise3d... Terminé en 0.2421 secondes.
+  -> Vitesse 3D : 41.31 Millions d'appels/sec
+
+=====================================================================
+ Fin du profilage de l'interface mathématique.
+=====================================================================
