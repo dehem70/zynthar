@@ -44,6 +44,8 @@
 #define ZYN_BIOME_PLAGE             10
 #define ZYN_BIOME_MONTAGNE_ROCHEUSE 11
 #define ZYN_BIOME_PIC_ENNEIGE       12
+#define ZYN_BIOME_ABYSSE            13
+#define ZYN_BIOME_EAU_INTERIEURE    14
 
 // Outils de conversion d'unités (Mètres <-> Décimètres)
 #define M_TO_DM(m)   (int16_t)((m) * 10.0f)

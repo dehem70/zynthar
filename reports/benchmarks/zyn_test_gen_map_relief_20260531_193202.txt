@@ -1,0 +1,35 @@
+=====================================================================
+     ZYNTHAR : PIPELINE GLOBAL DE GÉNÉRATION MACRO-GEOMORPHOLOGIQUE  
+=====================================================================
+ Fichier généré : zyn_test_gen_map_relief_20260531_193202.txt
+ Rapport d'accès: /home/dehem/Dev/zynthar/reports/benchmarks/zyn_test_gen_map_relief_20260531_193202.txt
+=====================================================================
+
+[1/5] Allocation de la grille MacroChunks (1955x977)... OK (0.0000 sec)
+[2/5] Calcul de l'archipel & calibration mer (4 îles, 45% eau)... OK (0.4923 sec)
+[3/5] Lissage des lignes de côtes par AC (3 itérations)... OK (0.0095 sec)
+[4/5] Application du gradient thermique longitudinal et altitude... OK (0.0600 sec)
+[4.5/5] Application du transport d'humidité et effet de fœhn... OK (0.3602 sec)
+[4.8/5] Tracé du réseau de rivières macro et détection des bassins... OK (0.2930 sec)
+
+[5/5] Évaluation de la matrice de Whittaker et classification... OK (0.0035 sec)
+
+[5/5] Vérification de la précision mathématique (Relief + Temp + Pluie)...
+  [ÉCHEC GEOMORPHO] Chunk #978500 : obtenu alt -186.100006m, attendu -225.100006m
+  [ÉCHEC MOD_HUMID]  Chunk #978500 : obtenu humid 1/255, attendu 135/255
+  [ÉCHEC GEOMORPHO] Chunk #489250 : obtenu alt -3.500000m, attendu 559.000000m
+  [ÉCHEC MOD_CLIMAT] Chunk #489250 : obtenu temp 1.901962, attendu 2.176472
+  [ÉCHEC MOD_HUMID]  Chunk #489250 : obtenu humid 2/255, attendu 255/255
+  [ÉCHEC GEOMORPHO] Chunk #197000 : obtenu alt -55.299999m, attendu -100.400002m
+  [ÉCHEC MOD_HUMID]  Chunk #197000 : obtenu humid 1/255, attendu 55/255
+  [ALERTE] Anomalie détectée dans le pipeline de non-régression.
+
+[EXPORT] Enregistrement des images PNG d'audit macro... 
+  -> 'carte_relief.png' exportée avec succès.
+  -> 'carte_temperature.png' exportée avec succès.
+  -> 'carte_rivieres.png' (Fleuves & Lacs) exportée avec succès.
+  -> 'carte_biomes.png' COULEURS RGB exportée avec succès !
+
+=====================================================================
+ GÉNERATION MACRO TERMINÉE AVEC SUCCÈS EN 1.5044 SECONDES
+=====================================================================

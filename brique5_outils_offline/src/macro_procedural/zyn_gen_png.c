@@ -359,3 +359,79 @@ int zyn_gen_png_rivers(const MacroChunk* map, int32_t width_x, int32_t depth_z, 
     free(pixels);
     return resultat;
 }
+
+/* =============================================================================
+ * EXPORTATION DE LA CARTE DES BIOMES EN COULEURS RGB (ÉCHELLE MACRO)
+ * ============================================================================= */
+int zyn_gen_png_biomes(const MacroChunk* map, int32_t width_x, int32_t depth_z, const char* filename) {
+    if (map == NULL || width_x <= 0 || depth_z <= 0 || filename == NULL) return 0;
+
+    size_t total_pixels = (size_t)width_x * (size_t)depth_z;
+    /* 3 Octets par pixel pour le mode RGB pur */
+    uint8_t* pixels = (uint8_t*)malloc(total_pixels * 3 * sizeof(uint8_t));
+    if (pixels == NULL) return 0;
+
+    for (size_t i = 0; i < total_pixels; i++) {
+        size_t p_idx = i * 3;
+        uint8_t b_id = map[i].biome;
+
+        uint8_t r = 0, g = 0, b = 0;
+
+        switch (b_id) {
+            case ZYN_BIOME_ABYSSE:
+                r = 5;   g = 15;  b = 45;   /* Bleu nuit ultra-sombre */
+                break;
+            case ZYN_BIOME_EAU_PROFONDE:
+                r = 15;  g = 40;  b = 95;   /* Bleu océan profond */
+                break;
+            case ZYN_BIOME_EAU_COTIERE:
+                r = 40;  g = 130; b = 190;  /* Cyan/Turquoise côtier */
+                break;
+            case ZYN_BIOME_EAU_INTERIEURE:
+                r = 45;  g = 100; b = 150;  /* Bleu doux pour l'eau douce des lacs */
+                break;
+            case ZYN_BIOME_PLAGE:
+                r = 230; g = 205; b = 140;  /* Jaune sable chaud */
+                break;
+            case ZYN_BIOME_DESERT:
+                r = 215; g = 155; b = 85;   /* Orange sable aride / Mesa */
+                break;
+            case ZYN_BIOME_PLAINE:
+                r = 160; g = 195; b = 105;  /* Vert prairie / Savane claire */
+                break;
+            case ZYN_BIOME_FORET:
+                r = 50;  g = 135; b = 70;   /* Vert d'arbres feuillus classique */
+                break;
+            case ZYN_BIOME_TAIGA:
+                r = 35;  g = 85;  b = 65;   /* Vert sombre bleuté de conifères */
+                break;
+            case ZYN_BIOME_TOUNDRA:
+                r = 135; g = 145; b = 130;  /* Gris-vert terne de lichen / Permafrost */
+                break;
+            case ZYN_BIOME_JUNGLE:
+                r = 10;  g = 95;  b = 40;   /* Vert émeraude tropical hyper-saturé */
+                break;
+            case ZYN_BIOME_GLACIER:
+                r = 195; g = 225; b = 235;  /* Bleu ciel très pâle glacé */
+                break;
+            case ZYN_BIOME_MONTAGNE_ROCHEUSE:
+                r = 110; g = 110; b = 115;  /* Gris rocheux de haute montagne */
+                break;
+            case ZYN_BIOME_PIC_ENNEIGE:
+                r = 245; g = 245; b = 250;  /* Blanc neige pur */
+                break;
+            default:
+                r = 0;   g = 0;   b = 0;     /* Noir par défaut (vide) */
+                break;
+        }
+
+        pixels[p_idx]     = r;
+        pixels[p_idx + 1] = g;
+        pixels[p_idx + 2] = b;
+    }
+
+    /* stbi_write_png prend le nombre de canaux (3 pour RGB) en 4ème argument */
+    int resultat = stbi_write_png(filename, width_x, depth_z, 3, pixels, width_x * 3);
+    free(pixels);
+    return resultat;
+}

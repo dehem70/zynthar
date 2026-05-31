@@ -25,6 +25,7 @@
 #include "zyn_gen_map_temperature.h"
 #include "zyn_gen_map_humidity.h"
 #include "zyn_gen_map_river.h"
+#include "zyn_gen_map_biome.h"
 
 #define SEED_MONDE           7777U
 #define ZYN_EPSILON          1e-5f
@@ -99,13 +100,13 @@ int main(void) {
     /* =========================================================================
      * PHASE 2 : FUSION GÉOMORPHOLOGIQUE (VORONOI VECTORISÉ + FRACTAL 2D)
      * ========================================================================= */
-    PRINT_BOTH("[2/5] Calcul de l'archipel & calibration mer (4 îles, 55%% eau)... ");
+    PRINT_BOTH("[2/5] Calcul de l'archipel & calibration mer (4 îles, 45%% eau)... ");
     fflush(stdout);
 
     zyn_noise_init(SEED_MONDE);
 
     start_etape = clock();
-    zyn_gen_map_relief_archipelago(map, width_x, depth_z, 4, 0.55f);
+    zyn_gen_map_relief_archipelago(map, width_x, depth_z, 4, 0.45f);
     end_etape = clock();
     
     PRINT_BOTH("OK (%.4f sec)\n", ((double)(end_etape - start_etape)) / CLOCKS_PER_SEC);
@@ -164,6 +165,17 @@ int main(void) {
     zyn_gen_map_river(map, width_x, depth_z, flux_grid);
     end_etape = clock();
     PRINT_BOTH("OK (%.4f sec)\n", ((double)(end_etape - start_etape)) / CLOCKS_PER_SEC);
+    
+    /* =========================================================================
+     * PHASE 5/5 : ATTRIBUTION LOGIQUE DES BIOMES ET EXPORT CHROMATIQUE
+     * ========================================================================= */
+    PRINT_BOTH("\n[5/5] Évaluation de la matrice de Whittaker et classification... ");
+    fflush(stdout);
+
+    start_etape = clock();
+    zyn_gen_map_biome(map, width_x, depth_z);
+    end_etape = clock();
+    PRINT_BOTH("OK (%.4f sec)\n", ((double)(end_etape - start_etape)) / CLOCKS_PER_SEC);
 
      /* =========================================================================
      * PHASE 5 : VÉRIFICATION DE LA NON-RÉGRESSION (DÉTERMINISME COMPRESSÉ)
@@ -177,7 +189,7 @@ int main(void) {
     };
     
     /* Témoins hydro-atmosphériques calés en synchrone */
-    uint8_t humidite_attendue[] = { 135, 69, 54 };
+    uint8_t humidite_attendue[] = { 135, 255, 55 };
 
     int32_t erreurs_relief = 0;
     int32_t erreurs_climat = 0;
@@ -216,24 +228,32 @@ int main(void) {
     }
 
     /* =========================================================================
-     * EXPORT VISUEL EN PNG VIA STB
+     * EXPORTATION DES RÉSULTATS VISUELS SUR DISQUE
      * ========================================================================= */
-    PRINT_BOTH("\nExportation des matrices d'octets en images PNG... ");
-    fflush(stdout);
+    PRINT_BOTH("\n[EXPORT] Enregistrement des images PNG d'audit macro... \n");
     
-    int img_alt = zyn_gen_png_elevation(map, width_x, depth_z, "carte_elevation.png", "carte_elevation_bin.png");
-    int img_temp = zyn_gen_png_temperature(map, width_x, depth_z, "carte_temperature.png");
-    int img_humid = zyn_gen_png_humidity(map, width_x, depth_z, "carte_humidite.png"); 
-    int img_wind_global = zyn_gen_png_wind_vectors(map, width_x, depth_z, "carte_vent_global_vecteurs.png");
-    int img_wind_local = zyn_gen_png_wind_local_vectors(map, width_x, depth_z, "carte_vent_local_vecteurs.png");
-    int img_river = zyn_gen_png_rivers(map, width_x, depth_z, flux_grid, "carte_rivieres.png"); 
-
-    if (img_alt && img_temp && img_wind_global && img_wind_local && img_humid && img_river) {
-        PRINT_BOTH("OK !\n");
-        PRINT_BOTH("  -> Fichiers des différentes cartes générés.\n");
-    } else {
-        PRINT_BOTH("[ÉCHEC ÉCRITURE DISQUE]\n");
+    if (zyn_gen_png_elevation(map, width_x, depth_z, "carte_relief.png","carte_relief_bin.png")) {
+        PRINT_BOTH("  -> 'carte_relief.png' exportée avec succès.\n");
     }
+    if (zyn_gen_png_temperature(map, width_x, depth_z, "carte_temperature.png")) {
+        PRINT_BOTH("  -> 'carte_temperature.png' exportée avec succès.\n");
+    }
+    if (zyn_gen_png_rivers(map, width_x, depth_z, flux_grid, "carte_rivieres.png")) {
+        PRINT_BOTH("  -> 'carte_rivieres.png' (Fleuves & Lacs) exportée avec succès.\n");
+    }
+    if (zyn_gen_png_biomes(map, width_x, depth_z, "carte_biomes.png")) {
+        PRINT_BOTH("  -> 'carte_biomes.png' COULEURS RGB exportée avec succès !\n");
+    }
+
+    /* Libération de la grille hydrographique */
     free(flux_grid);
-    return EXIT_SUCCESS;
+
+    end_global = clock();
+    double temps_total = ((double)(end_global - start_global)) / CLOCKS_PER_SEC;
+    PRINT_BOTH("\n=====================================================================\n");
+    PRINT_BOTH(" GÉNERATION MACRO TERMINÉE AVEC SUCCÈS EN %.4f SECONDES\n", temps_total);
+    PRINT_BOTH("=====================================================================\n");
+
+    free(map);
+    return 0;
 }

@@ -81,4 +81,15 @@ int zyn_gen_png_humidity(const MacroChunk* map, int32_t width_x, int32_t depth_z
  */
 int zyn_gen_png_rivers(const MacroChunk* map, int32_t width_x, int32_t depth_z, const uint32_t* flux_grid, const char* filename);
 
+/**
+ * @brief Exporte la carte des biomes.
+ *
+ * @param map Pointeur constant vers la grille de MacroChunks.
+ * @param width_x Largeur transversale de la carte.
+ * @param depth_z Longueur longitudinale de la carte.
+ * @param filename Chemin du fichier PNG hydrographique à générer.
+ * @return int 1 si le fichier a été écrit avec succès, 0 en cas d'échec.
+ */
+
+int zyn_gen_png_biomes(const MacroChunk* map, int32_t width_x, int32_t depth_z, const char* filename);
 #endif /* ZYN_GEN_PNG_H */

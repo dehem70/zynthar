@@ -66,10 +66,13 @@ void zyn_gen_map_humidity(MacroChunk* map, int32_t width_x, int32_t depth_z) {
             int32_t x_ouest = (x > 0) ? x - 1 : x;
             int32_t x_est   = (x < width_x - 1) ? x + 1 : x;
 
-            float alt_ouest = DM_TO_M(map[(size_t)offset_ligne + x_ouest].elevation_max_dm);
-            float alt_est   = DM_TO_M(map[(size_t)offset_ligne + x_est].elevation_max_dm);
-            float alt_sud   = DM_TO_M(map[(size_t)offset_sud   + x].elevation_max_dm);
-            float alt_nord  = DM_TO_M(map[(size_t)offset_nord  + x].elevation_max_dm);
+            /* Accès RAM direct ultra-rapide par décalage de pointeur (-1 / +1) */
+            float alt_ouest = DM_TO_M((chunk + x_ouest)->elevation_max_dm);
+            float alt_est   = DM_TO_M((chunk + x_est)->elevation_max_dm);
+            
+            /* Accès verticaux via offsets de lignes pré-calculés */
+            float alt_sud   = DM_TO_M(map[offset_sud + x].elevation_max_dm);
+            float alt_nord  = DM_TO_M(map[offset_nord + x].elevation_max_dm);
 
             /* Vecteurs du gradient topographique du sol (pente horizontale) */
             float slope_x = (alt_est - alt_ouest) * 0.5f;

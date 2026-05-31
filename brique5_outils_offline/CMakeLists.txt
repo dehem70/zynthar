@@ -19,6 +19,8 @@ add_library(zyn_procedural_offline STATIC
     src/macro_procedural/zyn_gen_map_humidity.h
     src/macro_procedural/zyn_gen_map_river.c
     src/macro_procedural/zyn_gen_map_river.h
+    src/macro_procedural/zyn_gen_map_biome.c
+    src/macro_procedural/zyn_gen_map_biome.h
     src/macro_procedural/zyn_gen_png.c
     src/macro_procedural/zyn_gen_png.h
 )

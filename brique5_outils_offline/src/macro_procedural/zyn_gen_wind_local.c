@@ -46,8 +46,11 @@ WindVector zyn_gen_map_wind_local(const MacroChunk* map, int32_t width_x, int32_
     float alt_nord  = DM_TO_M(map[(size_t)z_nord * width_x + chunk_x].elevation_max_dm);
 
     /* Vecteur de pente macro (différences centrales partielles) */
-    float slope_x = (alt_est - alt_ouest) / ((x_est - x_ouest) == 0 ? 1.0f : (float)(x_est - x_ouest));
-    float slope_z = (alt_nord - alt_sud) / ((z_nord - z_sud) == 0 ? 1.0f : (float)(z_nord - z_sud));
+    float inv_dx = ((x_est - x_ouest) == 2) ? 0.5f : 1.0f;
+    float inv_dz = ((z_nord - z_sud) == 2) ? 0.5f : 1.0f;
+    
+    float slope_x = (alt_est - alt_ouest) * inv_dx;
+    float slope_z = (alt_nord - alt_sud) * inv_dz;
 
     /* 3. Effets combinés : Friction (plaines/vallées) & Venturi (sommets) */
     float speed_global = sqrtf(wind.dx * wind.dx + wind.dy * wind.dy);
