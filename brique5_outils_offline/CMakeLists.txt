@@ -56,14 +56,14 @@ set_target_properties(zyn_test_noise PROPERTIES
 
 
 # =============================================================================
-# EXÉCUTABLE 2 : PIPELINE DE GÉNÉRATION MONDIAL GLOBAL (zyn_test_gen_map_relief)
+# EXÉCUTABLE 2 : PIPELINE DE GÉNÉRATION MONDIAL GLOBAL (zyn_gen_map_relief)
 # =============================================================================
-add_executable(zyn_test_gen_map_macro 
-    src/macro_procedural/zyn_test_gen_map_macro.c
+add_executable(zyn_gen_map_macro 
+    src/macro_procedural/zyn_gen_map_macro.c
 )
 
 # Liaison avec notre bibliothèque géomorphologique complète, l'include global et la lib m
-target_link_libraries(zyn_test_gen_map_macro 
+target_link_libraries(zyn_gen_map_macro 
     PRIVATE 
         zyn_procedural_offline
         zynthar_shared
@@ -113,7 +113,7 @@ set_target_properties(zyn_test_gen_river PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${
 
 
 # Dossier de sortie du binaire du pipeline de génération de monde
-set_target_properties(zyn_test_gen_map_macro PROPERTIES
+set_target_properties(zyn_gen_map_macro PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/brique5_outils_offline"
 )
 

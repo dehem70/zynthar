@@ -5,7 +5,7 @@
  * Auteur : Dehem70
  * Date   : 28/05/2026
  *
- * zyn_test_gen_map_relief : Test d'intégration global et Benchmark de performance
+ * zyn_gen_map_macro : Intégration global
  * pour l'intégralité de la chaîne géomorphologique macro (Relief, Climat, Image).
  * Sauvegarde un rapport persistant dans /reports/benchmarks/
  *
@@ -176,56 +176,6 @@ int main(void) {
     zyn_gen_map_biome(map, width_x, depth_z);
     end_etape = clock();
     PRINT_BOTH("OK (%.4f sec)\n", ((double)(end_etape - start_etape)) / CLOCKS_PER_SEC);
-
-     /* =========================================================================
-     * PHASE 5 : VÉRIFICATION DE LA NON-RÉGRESSION (DÉTERMINISME COMPRESSÉ)
-     * ========================================================================= */
-    PRINT_BOTH("\n[5/5] Vérification de la précision mathématique (Relief + Temp + Pluie)...\n");
-
-    TemoinMonde temoins[] = {
-        { 1000, 500,  -225.100006f,  37.039219f }, /* Zone A */
-        {  500, 250,   559.000000f,   2.176472f }, /* Zone B */
-        { 1500, 100,  -100.400002f, -14.843137f }  /* Zone C */
-    };
-    
-    /* Témoins hydro-atmosphériques calés en synchrone */
-    uint8_t humidite_attendue[] = { 135, 255, 55 };
-
-    int32_t erreurs_relief = 0;
-    int32_t erreurs_climat = 0;
-    int32_t erreurs_humid = 0;
-
-    for (int i = 0; i < 3; i++) {
-        int32_t idx = temoins[i].z * width_x + temoins[i].x;
-        
-        float alt_obtenue = DM_TO_M(map[idx].elevation_max_dm);
-        float temp_obtenue = RAW_TO_FLOAT(map[idx].temperature_raw);
-        uint8_t humid_obtenue = map[idx].biome; // Évaluation du buffer temporaire
-
-        /* Validation du relief */
-        if (fabsf(alt_obtenue - temoins[i].alt_attendue) > ZYN_EPSILON) {
-            PRINT_BOTH("  [ÉCHEC GEOMORPHO] Chunk #%d : obtenu alt %fm, attendu %fm\n", idx, alt_obtenue, temoins[i].alt_attendue);
-            erreurs_relief++;
-        }
-
-        /* Validation de la température */
-        if (fabsf(temp_obtenue - temoins[i].temp_attendue) > ZYN_EPSILON) {
-            PRINT_BOTH("  [ÉCHEC MOD_CLIMAT] Chunk #%d : obtenu temp %f, attendu %f\n", idx, temp_obtenue, temoins[i].temp_attendue);
-            erreurs_climat++;
-        }
-
-        /* Validation de l'humidité (Assertion stricte au bit près) */
-        if (humid_obtenue != humidite_attendue[i]) {
-            PRINT_BOTH("  [ÉCHEC MOD_HUMID]  Chunk #%d : obtenu humid %u/255, attendu %u/255\n", idx, humid_obtenue, humidite_attendue[i]);
-            erreurs_humid++;
-        }
-    }
-
-    if (erreurs_relief == 0 && erreurs_climat == 0 && erreurs_humid == 0) {
-        PRINT_BOTH("  [SUCCÈS] Stabilité géomorphologique, thermique et hydro-atmosphérique validée.\n");
-    } else {
-        PRINT_BOTH("  [ALERTE] Anomalie détectée dans le pipeline de non-régression.\n");
-    }
 
     /* =========================================================================
      * EXPORTATION DES RÉSULTATS VISUELS SUR DISQUE
