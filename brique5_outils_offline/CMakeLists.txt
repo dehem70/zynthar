@@ -15,6 +15,8 @@ add_library(zyn_procedural_offline STATIC
     src/macro_procedural/zyn_gen_wind_global.h
     src/macro_procedural/zyn_gen_wind_local.c
     src/macro_procedural/zyn_gen_wind_local.h
+    src/macro_procedural/zyn_gen_map_humidity.c
+    src/macro_procedural/zyn_gen_map_humidity.h
     src/macro_procedural/zyn_gen_png.c
     src/macro_procedural/zyn_gen_png.h
 )
@@ -91,6 +93,14 @@ target_link_libraries(zyn_test_gen_wind_local
         zynthar_shared
         m
 )
+
+# =============================================================================
+# EXÉCUTABLE 5 : STRESS-TEST & CONFORMITÉ HUMIDITÉ (zyn_test_gen_humidity)
+# =============================================================================
+add_executable(zyn_test_gen_humidity src/macro_procedural/zyn_test_gen_humidity.c)
+target_link_libraries(zyn_test_gen_humidity PRIVATE zyn_procedural_offline zynthar_shared m)
+set_target_properties(zyn_test_gen_humidity PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/brique5_outils_offline")
+
 # Dossier de sortie du binaire du pipeline de génération de monde
 set_target_properties(zyn_test_gen_map_macro PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/brique5_outils_offline"

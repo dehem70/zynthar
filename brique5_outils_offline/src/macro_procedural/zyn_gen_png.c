@@ -293,3 +293,23 @@ int zyn_gen_png_wind_local_vectors(const MacroChunk* map, int32_t width_x, int32
     free(pixels);
     return resultat;
 }
+
+/* =============================================================================
+ * EXPORTATION DE LA CARTE D'HUMIDITÉ TEMPORAIRE (STREAME BRUT DEPUIS LE BUFFER)
+ * ============================================================================= */
+int zyn_gen_png_humidity(const MacroChunk* map, int32_t width_x, int32_t depth_z, const char* filename) {
+    if (map == NULL || width_x <= 0 || depth_z <= 0 || filename == NULL) return 0;
+    
+    size_t total_pixels = (size_t)width_x * (size_t)depth_z;
+    uint8_t* pixels = (uint8_t*)malloc(total_pixels * sizeof(uint8_t));
+    if (pixels == NULL) return 0;
+
+    /* On lit directement l'octet brut temporaire stocké dans map[i].biome */
+    for (size_t i = 0; i < total_pixels; i++) {
+        pixels[i] = map[i].biome;
+    }
+
+    int resultat = stbi_write_png(filename, width_x, depth_z, 1, pixels, width_x);
+    free(pixels);
+    return resultat;
+}

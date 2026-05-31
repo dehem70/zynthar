@@ -1,0 +1,17 @@
+=====================================================================
+         ZYNTHAR : RAPPORT DE COHÉRENCE HYDRO-CLIMATIQUE             
+=====================================================================
+ Horodatage : 20260531_153155
+ Fichier    : /home/dehem/Dev/zynthar/reports/benchmarks/zyn_test_gen_humidity_20260531_153155.txt
+=====================================================================
+
+[1/3] Initialisation des couches géomorphologiques de base... OK.
+[2/3] Analyse de conformité face aux témoins de référence...
+  [SUCCÈS] Zone A (Plaine Équatoriale) : 133/255 (Conforme)
+  [SUCCÈS] Zone B (Sommet Nord / Fœhn) : 69/255 (Conforme)
+  [SUCCÈS] Zone C (Bassin Polaire Aride) : 51/255 (Conforme)
+
+[3/3] Lancement du stress-test de charge CPU...
+  Stressing zyn_gen_map_humidity... Terminé en 4.6434 secondes.
+  -> Performance brute : 4.11 Millions de chunks/sec
+=====================================================================

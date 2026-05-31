@@ -23,6 +23,7 @@
 #include "zyn_gen_map_relief.h"
 #include "zyn_gen_png.h"
 #include "zyn_gen_map_temperature.h"
+#include "zyn_gen_map_humidity.h"
 
 #define SEED_MONDE           7777U
 #define ZYN_EPSILON          1e-5f
@@ -135,48 +136,67 @@ int main(void) {
     end_etape = clock();
 
     PRINT_BOTH("OK (%.4f sec)\n", ((double)(end_etape - start_etape)) / CLOCKS_PER_SEC);
-
+    
     /* =========================================================================
+     * PHASE 4.5 : CALCUL MODÈLE HYDRO-ATMOSPHÉRIQUE (HUMIDITÉ / PLUIE)
+     * ========================================================================= */
+    PRINT_BOTH("[4.5/5] Application du transport d'humidité et effet de fœhn... ");
+    fflush(stdout);
+
+    start_etape = clock();
+    zyn_gen_map_humidity(map, width_x, depth_z);
+    end_etape = clock();
+
+    PRINT_BOTH("OK (%.4f sec)\n", ((double)(end_etape - start_etape)) / CLOCKS_PER_SEC);
+
+/* =========================================================================
      * PHASE 5 : VÉRIFICATION DE LA NON-RÉGRESSION (DÉTERMINISME COMPRESSÉ)
      * ========================================================================= */
-    PRINT_BOTH("\n[5/5] Vérification de la précision mathématique (Relief + Température)...\n");
+    PRINT_BOTH("\n[5/5] Vérification de la précision mathématique (Relief + Temp + Pluie)...\n");
 
-    /* Points de contrôles recalés sur la matrice de coordonnées (X, Z) */
     TemoinMonde temoins[] = {
         { 1000, 500,  -225.100006f,  37.039219f }, /* Zone A */
-        {  500, 250, 559.000000f,  2.176472f }, /* Zone B */
-        { 1500, 100, -100.400002f,  -14.843137f }  /* Zone C */
+        {  500, 250,   559.000000f,   2.176472f }, /* Zone B */
+        { 1500, 100,  -100.400002f, -14.843137f }  /* Zone C */
     };
+    
+    /* Témoins hydro-atmosphériques calés en synchrone */
+    uint8_t humidite_attendue[] = { 133, 69, 51 };
 
     int32_t erreurs_relief = 0;
     int32_t erreurs_climat = 0;
+    int32_t erreurs_humid = 0;
 
     for (int i = 0; i < 3; i++) {
         int32_t idx = temoins[i].z * width_x + temoins[i].x;
         
-        /* Décompression à la volée des types natifs pour l'évaluation de conformité */
         float alt_obtenue = DM_TO_M(map[idx].elevation_max_dm);
         float temp_obtenue = RAW_TO_FLOAT(map[idx].temperature_raw);
+        uint8_t humid_obtenue = map[idx].biome; // Évaluation du buffer temporaire
 
         /* Validation du relief */
         if (fabsf(alt_obtenue - temoins[i].alt_attendue) > ZYN_EPSILON) {
-            PRINT_BOTH("  [ÉCHEC GEOMORPHO] MacroChunk #%d (X:%d, Z:%d) : obtenu alt %fm, attendu %fm (Ajustement requis)\n", 
-                       idx, temoins[i].x, temoins[i].z, alt_obtenue, temoins[i].alt_attendue);
+            PRINT_BOTH("  [ÉCHEC GEOMORPHO] Chunk #%d : obtenu alt %fm, attendu %fm\n", idx, alt_obtenue, temoins[i].alt_attendue);
             erreurs_relief++;
         }
 
         /* Validation de la température */
         if (fabsf(temp_obtenue - temoins[i].temp_attendue) > ZYN_EPSILON) {
-            PRINT_BOTH("  [ÉCHEC MOD_CLIMAT] MacroChunk #%d (X:%d, Z:%d) : obtenu temp %f, attendu %f (Ajustement requis)\n", 
-                       idx, temoins[i].x, temoins[i].z, temp_obtenue, temoins[i].temp_attendue);
+            PRINT_BOTH("  [ÉCHEC MOD_CLIMAT] Chunk #%d : obtenu temp %f, attendu %f\n", idx, temp_obtenue, temoins[i].temp_attendue);
             erreurs_climat++;
+        }
+
+        /* Validation de l'humidité (Assertion stricte au bit près) */
+        if (humid_obtenue != humidite_attendue[i]) {
+            PRINT_BOTH("  [ÉCHEC MOD_HUMID]  Chunk #%d : obtenu humid %u/255, attendu %u/255\n", idx, humid_obtenue, humidite_attendue[i]);
+            erreurs_humid++;
         }
     }
 
-    if (erreurs_relief == 0 && erreurs_climat == 0) {
-        PRINT_BOTH("  [SUCCÈS] Le relief et le modèle thermique sont stables et déterministes.\n");
+    if (erreurs_relief == 0 && erreurs_climat == 0 && erreurs_humid == 0) {
+        PRINT_BOTH("  [SUCCÈS] Stabilité géomorphologique, thermique et hydro-atmosphérique validée.\n");
     } else {
-        PRINT_BOTH("  [ALERTE] Écarts détectés lors de la vérification. Si les axes ou le packaging (décimètres) viennent de changer, recalibrez les témoins.\n");
+        PRINT_BOTH("  [ALERTE] Anomalie détectée dans le pipeline de non-régression.\n");
     }
 
     /* =========================================================================
@@ -187,12 +207,13 @@ int main(void) {
     
     int img_alt = zyn_gen_png_elevation(map, width_x, depth_z, "carte_elevation.png", "carte_elevation_bin.png");
     int img_temp = zyn_gen_png_temperature(map, width_x, depth_z, "carte_temperature.png");
+    int img_humid = zyn_gen_png_humidity(map, width_x, depth_z, "carte_humidite.png"); // <-- Ajout de la carte de pluie
     int img_wind_global = zyn_gen_png_wind_vectors(map, width_x, depth_z, "carte_vent_global_vecteurs.png");
     int img_wind_local = zyn_gen_png_wind_local_vectors(map, width_x, depth_z, "carte_vent_local_vecteurs.png");
 
-    if (img_alt && img_temp && img_wind_global && img_wind_local) {
+    if (img_alt && img_temp && img_wind_global && img_wind_local && img_humid) {
         PRINT_BOTH("OK !\n");
-        PRINT_BOTH("  -> Fichiers 'carte_elevation.png', 'carte_elevation_bin.png', 'carte_temperature.png' , 'carte_vent_global_vecteurs.png' et ' carte_vent_local_vecteurs.png' générés.\n");
+        PRINT_BOTH("  -> Fichiers des différentes cartes générés.\n");
     } else {
         PRINT_BOTH("[ÉCHEC ÉCRITURE DISQUE]\n");
     }

@@ -56,4 +56,16 @@ int zyn_gen_png_wind_vectors(const MacroChunk* map, int32_t width_x, int32_t dep
  */
 int zyn_gen_png_wind_local_vectors(const MacroChunk* map, int32_t width_x, int32_t depth_z, const char* filename);
 
+/**
+ * @brief Exporte la carte d'humidité macro stockée temporairement dans le champ biome.
+ * La sécheresse absolue (0) sera noire, les précipitations maximales (255) seront blanches.
+ *
+ * @param map Pointeur constant vers la grille de MacroChunks.
+ * @param width_x Largeur transversale de la carte.
+ * @param depth_z Longueur longitudinale de la carte.
+ * @param filename Chemin du fichier PNG à générer (ex: "carte_humidite.png").
+ * @return int 1 si le fichier a été écrit avec succès, 0 en cas d'échec.
+ */
+int zyn_gen_png_humidity(const MacroChunk* map, int32_t width_x, int32_t depth_z, const char* filename);
+
 #endif /* ZYN_GEN_PNG_H */
