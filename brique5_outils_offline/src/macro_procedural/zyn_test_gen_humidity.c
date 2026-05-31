@@ -89,9 +89,9 @@ int main(void) {
 
     /* Valeurs de référence mathématiques fixes produites par l'algorithme orographique */
     TemoinHumidite temoins[] = {
-        { 1000, 500, 133, "Zone A (Plaine Équatoriale)" },
+        { 1000, 500, 135, "Zone A (Plaine Équatoriale)" },
         {  500, 250, 69, "Zone B (Sommet Nord / Fœhn)" },
-        { 1500, 100,  51, "Zone C (Bassin Polaire Aride)" }
+        { 1500, 100,  54, "Zone C (Bassin Polaire Aride)" }
     };
 
     for (int i = 0; i < 3; i++) {

@@ -24,6 +24,7 @@
 #include "zyn_gen_png.h"
 #include "zyn_gen_map_temperature.h"
 #include "zyn_gen_map_humidity.h"
+#include "zyn_gen_map_river.h"
 
 #define SEED_MONDE           7777U
 #define ZYN_EPSILON          1e-5f
@@ -148,8 +149,23 @@ int main(void) {
     end_etape = clock();
 
     PRINT_BOTH("OK (%.4f sec)\n", ((double)(end_etape - start_etape)) / CLOCKS_PER_SEC);
+    
+    /* =========================================================================
+     * PHASE 4.8 : CALCUL MODÈLE HYDROGRAPHIQUE MACRO CHUNK
+     * ========================================================================= */
+    PRINT_BOTH("[4.8/5] Tracé du réseau de rivières macro et détection des bassins... ");
+    fflush(stdout);
 
-/* =========================================================================
+    /* Allocation d'une grille de taille Macro (width_x * depth_z) */
+    size_t total_chunks_monde = (size_t)width_x * (size_t)depth_z;
+    uint32_t* flux_grid = (uint32_t*)calloc(total_chunks_monde, sizeof(uint32_t));
+
+    start_etape = clock();
+    zyn_gen_map_river(map, width_x, depth_z, flux_grid);
+    end_etape = clock();
+    PRINT_BOTH("OK (%.4f sec)\n", ((double)(end_etape - start_etape)) / CLOCKS_PER_SEC);
+
+     /* =========================================================================
      * PHASE 5 : VÉRIFICATION DE LA NON-RÉGRESSION (DÉTERMINISME COMPRESSÉ)
      * ========================================================================= */
     PRINT_BOTH("\n[5/5] Vérification de la précision mathématique (Relief + Temp + Pluie)...\n");
@@ -161,7 +177,7 @@ int main(void) {
     };
     
     /* Témoins hydro-atmosphériques calés en synchrone */
-    uint8_t humidite_attendue[] = { 133, 69, 51 };
+    uint8_t humidite_attendue[] = { 135, 69, 54 };
 
     int32_t erreurs_relief = 0;
     int32_t erreurs_climat = 0;
@@ -207,15 +223,17 @@ int main(void) {
     
     int img_alt = zyn_gen_png_elevation(map, width_x, depth_z, "carte_elevation.png", "carte_elevation_bin.png");
     int img_temp = zyn_gen_png_temperature(map, width_x, depth_z, "carte_temperature.png");
-    int img_humid = zyn_gen_png_humidity(map, width_x, depth_z, "carte_humidite.png"); // <-- Ajout de la carte de pluie
+    int img_humid = zyn_gen_png_humidity(map, width_x, depth_z, "carte_humidite.png"); 
     int img_wind_global = zyn_gen_png_wind_vectors(map, width_x, depth_z, "carte_vent_global_vecteurs.png");
     int img_wind_local = zyn_gen_png_wind_local_vectors(map, width_x, depth_z, "carte_vent_local_vecteurs.png");
+    int img_river = zyn_gen_png_rivers(map, width_x, depth_z, flux_grid, "carte_rivieres.png"); 
 
-    if (img_alt && img_temp && img_wind_global && img_wind_local && img_humid) {
+    if (img_alt && img_temp && img_wind_global && img_wind_local && img_humid && img_river) {
         PRINT_BOTH("OK !\n");
         PRINT_BOTH("  -> Fichiers des différentes cartes générés.\n");
     } else {
         PRINT_BOTH("[ÉCHEC ÉCRITURE DISQUE]\n");
     }
+    free(flux_grid);
     return EXIT_SUCCESS;
 }

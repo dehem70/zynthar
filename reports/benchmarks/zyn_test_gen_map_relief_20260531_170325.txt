@@ -1,0 +1,19 @@
+=====================================================================
+     ZYNTHAR : PIPELINE GLOBAL DE GÉNÉRATION MACRO-GEOMORPHOLOGIQUE  
+=====================================================================
+ Fichier généré : zyn_test_gen_map_relief_20260531_170325.txt
+ Rapport d'accès: /home/dehem/Dev/zynthar/reports/benchmarks/zyn_test_gen_map_relief_20260531_170325.txt
+=====================================================================
+
+[1/5] Allocation de la grille MacroChunks (1955x977)... OK (0.0000 sec)
+[2/5] Calcul de l'archipel & calibration mer (4 îles, 55% eau)... OK (0.5424 sec)
+[3/5] Lissage des lignes de côtes par AC (3 itérations)... OK (0.0109 sec)
+[4/5] Application du gradient thermique longitudinal et altitude... OK (0.0759 sec)
+[4.5/5] Application du transport d'humidité et effet de fœhn... OK (0.4591 sec)
+[4.8/5] Tracé du réseau de rivières et détection des lacs... OK (1.7231 sec)
+
+[5/5] Vérification de la précision mathématique (Relief + Temp + Pluie)...
+  [SUCCÈS] Stabilité géomorphologique, thermique et hydro-atmosphérique validée.
+
+Exportation des matrices d'octets en images PNG... OK !
+  -> Fichiers des différentes cartes générés.

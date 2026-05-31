@@ -68,4 +68,17 @@ int zyn_gen_png_wind_local_vectors(const MacroChunk* map, int32_t width_x, int32
  */
 int zyn_gen_png_humidity(const MacroChunk* map, int32_t width_x, int32_t depth_z, const char* filename);
 
+/**
+ * @brief Exporte la carte hydrographique à l'échelle fine (Micro-Chunks) superposée au relief.
+ * Les lits des rivières s'éclairent proportionnellement à la force de leur débit.
+ *
+ * @param map Pointeur constant vers la grille de MacroChunks.
+ * @param width_x Largeur transversale de la carte.
+ * @param depth_z Longueur longitudinale de la carte.
+ * @param flux_grid Grille de flux micro calculée (taille width_x * depth_z * 400).
+ * @param filename Chemin du fichier PNG hydrographique à générer.
+ * @return int 1 si le fichier a été écrit avec succès, 0 en cas d'échec.
+ */
+int zyn_gen_png_rivers(const MacroChunk* map, int32_t width_x, int32_t depth_z, const uint32_t* flux_grid, const char* filename);
+
 #endif /* ZYN_GEN_PNG_H */

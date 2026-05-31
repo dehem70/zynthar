@@ -1,0 +1,16 @@
+=====================================================================
+         ZYNTHAR : RAPPORT HYDROGRAPHIQUE (RIVIÈRES MICRO)           
+=====================================================================
+ Horodatage : 20260531_160101
+ Fichier    : /home/dehem/Dev/zynthar/reports/benchmarks/zyn_test_gen_river_20260531_160101.txt
+=====================================================================
+
+[1/3] Génération du modèle géomorphologique mondial... OK.
+[2/3] Tracé du réseau hydrographique vectoriel... OK.
+  -> Nombre de lits de rivières fins générés : 4316 cellules
+  -> Débit maximal enregistré (Fleuve majeur) : 93
+
+[3/3] Lancement du stress-test hydrographique (15 passes globales)... 
+  Stressing zyn_gen_map_river... Terminé en 5.2141 secondes.
+  -> Performance : 2.88 passes mondiales hydrographiques complètes/sec
+=====================================================================

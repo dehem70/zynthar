@@ -313,3 +313,49 @@ int zyn_gen_png_humidity(const MacroChunk* map, int32_t width_x, int32_t depth_z
     free(pixels);
     return resultat;
 }
+
+/* =============================================================================
+ * EXPORTATION DE LA CARTE HYDROGRAPHIQUE À L'ÉCHELLE MACRO CHUNK
+ * ============================================================================= */
+int zyn_gen_png_rivers(const MacroChunk* map, int32_t width_x, int32_t depth_z, const uint32_t* flux_grid, const char* filename) {
+    if (map == NULL || width_x <= 0 || depth_z <= 0 || flux_grid == NULL || filename == NULL) return 0;
+
+    size_t total_pixels = (size_t)width_x * (size_t)depth_z;
+    uint8_t* pixels = (uint8_t*)malloc(total_pixels * sizeof(uint8_t));
+    if (pixels == NULL) return 0;
+
+    const float alt_min_rendu = ZYN_WORLD_Y_MIN;
+    const float range_rendu = (float)ZYN_WORLD_Y_MAX - alt_min_rendu;
+
+    /* 1. Première passe : Rendu du relief de fond assombri */
+    for (size_t i = 0; i < total_pixels; i++) {
+        float alt_m = DM_TO_M(map[i].elevation_max_dm);
+        float normalisee = (alt_m - alt_min_rendu) / range_rendu;
+        if (normalisee > 1.0f) normalisee = 1.0f;
+        if (normalisee < 0.0f) normalisee = 0.0f;
+
+        pixels[i] = (uint8_t)(normalisee * 255.0f * 0.15f); /* Fond feutré à 15% pour le contraste */
+    }
+
+    /* 2. Deuxième passe : Superposition des cours d'eau et des surfaces de lacs */
+    for (size_t i = 0; i < total_pixels; i++) {
+        /* Rendu prioritaire des lacs inondés par notre algorithme de Sink Filling */
+        if (map[i].biome == 255 && map[i].elevation_max_dm > 0) {
+            pixels[i] = 255; /* Blanc pur éclatant pour matérialiser la surface de l'eau douce */
+            continue;
+        }
+
+        /* Rendu du flux linéaire des rivières classiques */
+        uint32_t flux = flux_grid[i];
+        if (flux > 0) {
+            /* Intensité progressive selon la taille du bassin versant collecté */
+            uint32_t intensite = 130 + (flux * 4);
+            if (intensite > 240) intensite = 240; /* On sature juste en dessous du blanc du lac */
+            pixels[i] = (uint8_t)intensite;
+        }
+    }
+
+    int resultat = stbi_write_png(filename, width_x, depth_z, 1, pixels, width_x);
+    free(pixels);
+    return resultat;
+}
