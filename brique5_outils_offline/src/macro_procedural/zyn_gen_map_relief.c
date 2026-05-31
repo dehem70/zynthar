@@ -237,8 +237,8 @@ void zyn_gen_map_relief_archipelago(MacroChunk* map, int32_t width_x, int32_t de
     /* =========================================================================
      * ÉTAPE 6 : ÉTALEMENT PAR MORCEAUX ET UNIQUE COMPRESSION FINALE
      * ========================================================================= */
-    for (size_t i = 0; i < total_cases; i++) {
-        float alt_relative = hauteurs_triees[i] - niveau_mer_calcule;
+    for (size_t index = 0; index < total_cases; index++) {
+        float alt_relative = hauteurs_triees[index] - niveau_mer_calcule;
         float alt_finale_m = 0.0f ;
 
         /* Le coefficient étire le relief, et on l'ajoute au niveau de la mer de référence */
@@ -256,9 +256,9 @@ void zyn_gen_map_relief_archipelago(MacroChunk* map, int32_t width_x, int32_t de
         float alt_clamped_m = fmaxf(limite_basse, fminf(alt_finale_m, limite_haute));
 
         /* L'unique arrondi de la chaîne : passage en int16_t décimètres */
-        map[i].elevation_max_dm = (int16_t)roundf(alt_clamped_m * 10.0f);
-        map[i].chunk_x = (int32_t)(i % width_x);
-        map[i].chunk_z = (int32_t)(i / width_x);
+        map[index].elevation_max_dm = (int16_t)roundf(alt_clamped_m * 10.0f);
+        map[index].chunk_x = (int32_t)(index % width_x);
+        map[index].chunk_z = (int32_t)(index / width_x);
     }
 
     free(hauteurs_triees);

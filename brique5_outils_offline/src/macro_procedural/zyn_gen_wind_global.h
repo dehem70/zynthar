@@ -1,5 +1,5 @@
-#ifndef WIND_GLOBAL_H
-#define WIND_GLOBAL_H
+#ifndef ZYN_GEN_WIND_GLOBAL_H
+#define ZYN_GEN_WIND_GLOBAL_H
 
 /* =============================================================================
  * Projet Zynthar v.0.1.0
@@ -17,4 +17,4 @@ typedef struct {
 // Calcule le vent global pur pour un macro-chunk donné (Fonction pure)
 WindVector get_global_wind(int32_t chunk_x, int32_t chunk_y);
 
-#endif // WIND_GLOBAL_H
+#endif // ZYN_GEN_WIND_GLOBAL_H

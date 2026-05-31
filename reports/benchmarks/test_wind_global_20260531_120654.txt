@@ -1,0 +1,18 @@
+=====================================================================
+         ZYNTHAR : RAPPORT DE TEST DE COHÉRENCE (wind_global)        
+=====================================================================
+ Fichier généré : test_wind_global_20260531_120654.txt
+ Chemin absolu  : /home/dehem/Dev/zynthar/reports/benchmarks/test_wind_global_20260531_120654.txt
+=====================================================================
+
+[1/3] Initialisation de zyn_noise avec la graine 424242...
+[2/3] Vérification du déterminisme sur le Macro-Chunk (200, 150)...
+  -> Échantillon 1 : dx = 0.0000, dy = 0.0000
+  -> Échantillon 2 : dx = 0.0000, dy = 0.0000
+  [SUCCÈS] Intégration zyn_noise et stabilité vectorielle validées.
+[3/3] Analyse de la plausibilité physique et des structures de données...
+  -> Vitesse scalaire calculée : 0.00 km/h (Limite macro configurée : 90.00 km/h)
+
+=====================================================================
+ ✅ TOUS LES TESTS DE NON-RÉGRESSION SONT AU VERT POUR WIND_GLOBAL
+=====================================================================

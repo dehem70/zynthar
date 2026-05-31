@@ -32,4 +32,28 @@ int zyn_gen_png_elevation(const MacroChunk* map, int32_t width_x, int32_t depth_
  */
 int zyn_gen_png_temperature(const MacroChunk* map, int32_t width_x, int32_t depth_z, const char* filename);  
 
+/**
+ * @brief Exporte la carte des vecteurs de vent sous forme de grille de flèches (Quiver Plot).
+ * Dessine des segments orientés par-dessus la carte de vitesse en niveaux de gris.
+ *
+ * @param map Pointeur constant vers la grille de MacroChunks.
+ * @param width_x Largeur transversale de la carte (Axe X).
+ * @param depth_z Longueur longitudinale de la carte (Axe Z).
+ * @param filename Chemin du fichier PNG vectoriel à générer (ex: "carte_vent_vecteurs.png").
+ * @return int 1 si le fichier a été écrit avec succès, 0 en cas d'échec.
+ */
+int zyn_gen_png_wind_vectors(const MacroChunk* map, int32_t width_x, int32_t depth_z, const char* filename);
+
+/**
+ * @brief Exporte la carte du vent local sous forme de grille de flèches (Quiver Plot) superposée au relief.
+ * Le fond affiche la topographie amortie, les flèches blanches montrent les déviations et accélérations.
+ *
+ * @param map Pointeur constant vers la grille de MacroChunks.
+ * @param width_x Largeur transversale de la carte (Axe X).
+ * @param depth_z Longueur longitudinale de la carte (Axe Z).
+ * @param filename Chemin du fichier PNG vectoriel local à générer (ex: "carte_vent_local_vecteurs.png").
+ * @return int 1 si le fichier a été écrit avec succès, 0 en cas d'échec.
+ */
+int zyn_gen_png_wind_local_vectors(const MacroChunk* map, int32_t width_x, int32_t depth_z, const char* filename);
+
 #endif /* ZYN_GEN_PNG_H */

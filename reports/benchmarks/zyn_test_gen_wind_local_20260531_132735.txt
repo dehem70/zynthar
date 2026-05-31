@@ -1,0 +1,18 @@
+=====================================================================
+       ZYNTHAR : VALIDATION & STRESS-TEST DU VENT LOCAL MACRO        
+=====================================================================
+ Horodatage : 20260531_132735
+ Rapport    : /home/dehem/Dev/zynthar/reports/benchmarks/zyn_test_gen_wind_local_20260531_132735.txt
+=====================================================================
+
+[1/3] Génération d'un relief de référence pour le test...
+[2/3] Validation de la stabilité fonctionnelle au point (500, 250)...
+  -> Vecteur Local 1 : dx = -49.2439, dy = -47.0919
+  -> Vecteur Local 2 : dx = -49.2439, dy = -47.0919
+  -> Vitesse scalaire physique locale : 68.14 km/h (Seuil max : 140.00 km/h)
+  [SUCCÈS] Validation fonctionnelle accomplie avec stabilité.
+
+[3/3] Lancement du benchmark de performance (10000000 itérations)... 
+  Stressing zyn_gen_map_wind_local... Terminé en 1.7807 secondes.
+  -> Performance : 5.62 Millions d'échantillonnages locaux/sec
+=====================================================================

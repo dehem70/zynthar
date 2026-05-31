@@ -126,6 +126,10 @@ int main(void) {
     PRINT_BOTH("[4/5] Application du gradient thermique longitudinal et altitude... ");
     fflush(stdout);
 
+    /* SÉCURITÉ ARCHITECTURALE : On ré-initialise le moteur de bruit avec la graine mondiale
+     * juste avant le calcul pour écraser tout effet de bord d'un sous-test précédent */
+    zyn_noise_init(SEED_MONDE);
+    
     start_etape = clock();
     zyn_gen_map_temperature(map, width_x, depth_z);
     end_etape = clock();
@@ -183,27 +187,14 @@ int main(void) {
     
     int img_alt = zyn_gen_png_elevation(map, width_x, depth_z, "carte_elevation.png", "carte_elevation_bin.png");
     int img_temp = zyn_gen_png_temperature(map, width_x, depth_z, "carte_temperature.png");
+    int img_wind_global = zyn_gen_png_wind_vectors(map, width_x, depth_z, "carte_vent_global_vecteurs.png");
+    int img_wind_local = zyn_gen_png_wind_local_vectors(map, width_x, depth_z, "carte_vent_local_vecteurs.png");
 
-    if (img_alt && img_temp) {
+    if (img_alt && img_temp && img_wind_global && img_wind_local) {
         PRINT_BOTH("OK !\n");
-        PRINT_BOTH("  -> Fichiers 'carte_elevation.png', 'carte_elevation_bin.png' et 'carte_temperature.png' générés.\n");
+        PRINT_BOTH("  -> Fichiers 'carte_elevation.png', 'carte_elevation_bin.png', 'carte_temperature.png' , 'carte_vent_global_vecteurs.png' et ' carte_vent_local_vecteurs.png' générés.\n");
     } else {
         PRINT_BOTH("[ÉCHEC ÉCRITURE DISQUE]\n");
     }
-
-    /* Nettoyage de la mémoire */
-    zyn_gen_map_relief_free(map);
-
-    end_global = clock();
-    temps_cpu = ((double)(end_global - start_global)) / CLOCKS_PER_SEC;
-
-    PRINT_BOTH("\n=====================================================================\n");
-    PRINT_BOTH(" VITESSE PIPELINE MONDIAL : Généré en %.4f secondes (Chaîne complète)\n", temps_cpu);
-    PRINT_BOTH("=====================================================================\n");
-
-    fclose(report);
-    #undef PRINT_BOTH
-
-    // On retourne un statut de succès indicatif pour ne pas bloquer les scripts d'automation CMAKE
     return EXIT_SUCCESS;
 }

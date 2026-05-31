@@ -11,6 +11,10 @@ add_library(zyn_procedural_offline STATIC
     src/macro_procedural/zyn_gen_map_relief.h
     src/macro_procedural/zyn_gen_map_temperature.c
     src/macro_procedural/zyn_gen_map_temperature.h
+    src/macro_procedural/zyn_gen_wind_global.c
+    src/macro_procedural/zyn_gen_wind_global.h
+    src/macro_procedural/zyn_gen_wind_local.c
+    src/macro_procedural/zyn_gen_wind_local.h
     src/macro_procedural/zyn_gen_png.c
     src/macro_procedural/zyn_gen_png.h
 )
@@ -60,6 +64,33 @@ target_link_libraries(zyn_test_gen_map_macro
         m
 )
 
+# =============================================================================
+# EXÉCUTABLE 3 : RAPPORT ET TEST DU VENT GLOBAL MACRO (zyn_test_gen_wind_global)
+# =============================================================================
+add_executable(zyn_test_gen_wind_global 
+    src/macro_procedural/zyn_test_gen_wind_global.c
+)
+
+# Liaison avec notre bibliothèque, les définitions globales et la lib m (cosf/sinf/sqrtf)
+target_link_libraries(zyn_test_gen_wind_global 
+    PRIVATE 
+        zyn_procedural_offline
+        zynthar_shared
+        m
+)
+
+# =============================================================================
+# EXÉCUTABLE 4 : STRESS-TEST & CONFORMITÉ VENT LOCAL (zyn_test_gen_wind_local)
+# =============================================================================
+add_executable(zyn_test_gen_wind_local 
+    src/macro_procedural/zyn_test_gen_wind_local.c
+)
+target_link_libraries(zyn_test_gen_wind_local 
+    PRIVATE 
+        zyn_procedural_offline
+        zynthar_shared
+        m
+)
 # Dossier de sortie du binaire du pipeline de génération de monde
 set_target_properties(zyn_test_gen_map_macro PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/brique5_outils_offline"

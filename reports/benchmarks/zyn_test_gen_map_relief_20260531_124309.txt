@@ -1,0 +1,20 @@
+=====================================================================
+     ZYNTHAR : PIPELINE GLOBAL DE GÉNÉRATION MACRO-GEOMORPHOLOGIQUE  
+=====================================================================
+ Fichier généré : zyn_test_gen_map_relief_20260531_124309.txt
+ Rapport d'accès: /home/dehem/Dev/zynthar/reports/benchmarks/zyn_test_gen_map_relief_20260531_124309.txt
+=====================================================================
+
+[1/5] Allocation de la grille MacroChunks (1955x977)... OK (0.0000 sec)
+[2/5] Calcul de l'archipel & calibration mer (4 îles, 55% eau)... OK (0.5260 sec)
+[3/5] Lissage des lignes de côtes par AC (3 itérations)... OK (0.0095 sec)
+[4/5] Application du gradient thermique longitudinal et altitude... OK (0.0605 sec)
+
+[5/5] Vérification de la précision mathématique (Relief + Température)...
+  [ÉCHEC MOD_CLIMAT] MacroChunk #978500 (X:1000, Z:500) : obtenu temp -1687.960815, attendu 37.039219 (Ajustement requis)
+  [ÉCHEC MOD_CLIMAT] MacroChunk #489250 (X:500, Z:250) : obtenu temp -1722.823486, attendu 2.176472 (Ajustement requis)
+  [ÉCHEC MOD_CLIMAT] MacroChunk #197000 (X:1500, Z:100) : obtenu temp -1739.843140, attendu -14.843137 (Ajustement requis)
+  [ALERTE] Écarts détectés lors de la vérification. Si les axes ou le packaging (décimètres) viennent de changer, recalibrez les témoins.
+
+Exportation des matrices d'octets en images PNG... OK !
+  -> Fichiers 'carte_elevation.png', 'carte_elevation_bin.png', 'carte_temperature.png' , 'carte_vitesse_vent.png' et 'carte_vent_vecteurs.png' générés.

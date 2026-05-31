@@ -2,6 +2,7 @@
 #define ZYNTHAR_H
 
 #include <stdint.h>
+#include <math.h>
 
 // --- Configurations des bases de Données ---
 #define ZYN_DB_EMPLACEMENT      "data/"
@@ -48,9 +49,9 @@
 #define M_TO_DM(m)   (int16_t)((m) * 10.0f)
 #define DM_TO_M(dm)  (float)((dm) / 10.0f)
 
-// Outils de conversion climatiques (Float 0.0-1.0 <-> Uint8 0-255)
-#define FLOAT_TO_RAW(f)  (uint8_t)((((f) * 255.0f))-ZYN_WORLD_TEMP_MIN)/(ZYN_WORLD_TEMP_MAX-ZYN_WORLD_TEMP_MIN)
-#define RAW_TO_FLOAT(r)  (float)(ZYN_WORLD_TEMP_MIN+((r) / 255.0f))*(ZYN_WORLD_TEMP_MAX-ZYN_WORLD_TEMP_MIN)
+// Outils de conversion climatiques corrigés et sécurisés par parenthésage strict
+#define FLOAT_TO_RAW(f)  ((uint8_t)(roundf(((f) - (ZYN_WORLD_TEMP_MIN)) / ((ZYN_WORLD_TEMP_MAX) - (ZYN_WORLD_TEMP_MIN)) * 255.0f)))
+#define RAW_TO_FLOAT(r)  ((float)(ZYN_WORLD_TEMP_MIN) + (((float)(r) / 255.0f) * ((float)(ZYN_WORLD_TEMP_MAX) - (ZYN_WORLD_TEMP_MIN))))
 
 /**
  * @brief Structure ultra-optimisée représentant un MacroChunk.
