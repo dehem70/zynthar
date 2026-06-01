@@ -4,7 +4,12 @@
 #include <stdint.h>
 #include <math.h>
 
+#ifndef ZYN_INDEX
 #define ZYN_INDEX(x, z, width) (((size_t)(z) * (size_t)(width)) + (size_t)(x))
+#endif
+
+//pour sauvegarde des images
+int stbi_write_png(char const *filename, int w, int h, int comp, void const *data, int stride_in_bytes);
 
 // --- Configurations des bases de Données ---
 #define ZYN_DB_EMPLACEMENT      "data/"
@@ -13,8 +18,8 @@
 #define ZYN_DB_DELTA            "zyn-delta.db"
 
 // --- Paramètres de l'Univers de Zynthar (Alignement Voxel / Chunk Parfait) ---
-#define ZYN_WORLD_X_MAX         1024256  // Longueur : 1000.96 km (39100 Micro-Chunks)
-#define ZYN_WORLD_Z_MAX         512256   // Largeur : 500.224 km   (19540 Micro-Chunks)
+#define ZYN_WORLD_MACRO_WIDTH_X      2000   // 2000 macro chunks de long
+#define ZYN_WORLD_MACRO_DEPTH_Z      1000   // 1000 macro chunks de large
 
 #define ZYN_WORLD_Y_MIN         -1024    // Profondeur max : -1024 m (Exactement 40 Micro-Chunks sous Y=0)
 #define ZYN_WORLD_Y_MAX         2048     // Hauteur max : +2048 m     (Exactement 80 Micro-Chunks au-dessus de Y=0)
@@ -27,6 +32,9 @@
 #define ZYN_MICRO_CHUNK_DIM_VOX 256      // 256 voxels de côté (25.6m)
 #define ZYN_MICRO_CHUNK_SHIFT   8        // 2^8 = 256 (Pour les décalages de bits rapides)
 #define ZYN_MACRO_CHUNK_DIM_M   512      // 512m de côté (Exactement 20 Micro-Chunks)
+
+#define ZYN_WORLD_X_MAX         (ZYN_WORLD_MACRO_WIDTH_X * ZYN_MACRO_CHUNK_DIM_M)
+#define ZYN_WORLD_Z_MAX         (ZYN_WORLD_MACRO_DEPTH_Z * ZYN_MACRO_CHUNK_DIM_M)
 
 // --- Seuils Physiques de Déplacement (Exprimés en nombre de voxels de 10cm) ---
 #define ZYN_SEUIL_MARCHE_AUTO   4        // <= 40 cm (1 à 4 blocs)

@@ -20,6 +20,7 @@
 #include <zynthar.h>
 #include "zyn_noise.h"
 #include "zyn_gen_map_relief.h"
+#include "zyn_test_framework.h"
 
 typedef struct {
     float x;
@@ -50,6 +51,7 @@ float* zyn_gen_map_relief_voronoi(int32_t width_x, int32_t depth_z, int32_t num_
         return NULL;
     }
 
+    /* Positionnement déterministe des germes */
     uint32_t lcg_state = seed; 
     for (int32_t i = 0; i < num_islands; i++) {
         lcg_state = lcg_state * 1103515245 + 12345;
@@ -61,27 +63,47 @@ float* zyn_gen_map_relief_voronoi(int32_t width_x, int32_t depth_z, int32_t num_
         seeds[i].z = rand_z * (float)depth_z;
     }
 
-    float max_dist_normale = (width_x < depth_z ? (float)width_x : (float)depth_z) / 3.5f; 
+    /* Rayon d'impact ajusté pour s'étendre joliment */
+    float max_dist_normale = (width_x < depth_z ? (float)width_x : (float)depth_z) / 1.5f; 
     float max_dist_carre = max_dist_normale * max_dist_normale;
 
-    /* RECONDUCTION DE L'EPSILON DE STABILISATION GEOMETRIQUE */
+    /* CONSTANTE DE STABILISATION NUMÉRIQUE CONTRE LES SAUTS DE REGISTRES */
     const float EPSILON_STABILITE = 0.123456f;
 
     for (int32_t z = 0; z < depth_z; z++) {
-        float fz = (float)z + EPSILON_STABILITE; // Sécurisé
+        float fz = (float)z + EPSILON_STABILITE;
 
         for (int32_t x = 0; x < width_x; x++) {
-            float fx = (float)x + EPSILON_STABILITE; // Sécurisé
-            float min_dist_carre = 99999999.0f;
+            float fx = (float)x + EPSILON_STABILITE;
 
+            /* 1. PRÉ-WARPING : Distorsion fluide basse fréquence de l'espace */
+            float v_warp_x = zyn_noise2d((fx + 400.0f) * 0.003f, (fz - 200.0f) * 0.003f) * 40.0f;
+            float v_warp_z = zyn_noise2d((fx - 100.0f) * 0.003f, (fz + 600.0f) * 0.003f) * 40.0f;
+
+            float fx_deforme = fx + v_warp_x;
+            float fz_deforme = fz + v_warp_z;
+
+            float min_dist_hybride_carre = 99999999.0f;
+
+            /* 2. RECHERCHE ET RECOUUREMENT DES MÉTRIQUES MIXTES */
             for (int32_t i = 0; i < num_islands; i++) {
-                float dx = seeds[i].x - fx;
-                float dz = seeds[i].z - fz;
-                float dist_carre = (dx * dx) + (dz * dz);
-                if (dist_carre < min_dist_carre) min_dist_carre = dist_carre;
+                float dx = fabsf(seeds[i].x - fx_deforme);
+                float dz = fabsf(seeds[i].z - fz_deforme);
+
+                float dist_euclidienne_carre = (dx * dx) + (dz * dz);
+                float dist_manhattan = dx + dz;
+                float dist_manhattan_carre = dist_manhattan * dist_manhattan;
+
+                /* Mix structurel : 75% Euclide (courbes) + 25% Manhattan (arêtes) */
+                float dist_mixte_carre = (dist_euclidienne_carre * 0.75f) + (dist_manhattan_carre * 0.25f);
+
+                if (dist_mixte_carre < min_dist_hybride_carre) {
+                    min_dist_hybride_carre = dist_mixte_carre;
+                }
             }
 
-            float val = 1.0f - (min_dist_carre / max_dist_carre);
+            /* Atténuation en fonction du rayon maximum */
+            float val = 1.0f - (min_dist_hybride_carre / max_dist_carre);
             if (val < 0.0f) val = 0.0f;
 
             size_t index = ZYN_INDEX(x, z, width_x);
@@ -103,11 +125,28 @@ static int comparer_floats(const void* a, const void* b) {
 /* =============================================================================
  * FUSION DU RELIEF ET SCULPTURE DES CONTINENTS
  * ============================================================================= */
-void zyn_gen_map_relief_archipelago(MacroChunk* map, int32_t width_x, int32_t depth_z, int32_t num_islands, float max_sea_percentage, uint32_t seed) {
+void zyn_gen_map_relief_archipelago(MacroChunk* map, int32_t width_x, int32_t depth_z, int32_t num_islands, float max_sea_percentage, uint32_t seed,ZynTestConfig* test_config) {
     if (map == NULL || width_x <= 0 || depth_z <= 0) return;
 
     float* masque_voronoi = zyn_gen_map_relief_voronoi(width_x, depth_z, num_islands, seed);
     if (masque_voronoi == NULL) return;
+    
+    /* -------------------------------------------------------------------------
+       INTERCEPTION ET COPIE DANS MAP SI ARRET PAS 1 DEMANDÉ
+       ------------------------------------------------------------------------- */
+    if (test_config != NULL && test_config->active_test == 1 && test_config->target_step == 1) {
+        for (int32_t z = 0; z < depth_z; z++) {
+            for (int32_t x = 0; x < width_x; x++) {
+                size_t index = ZYN_INDEX(x, z, width_x);
+                map[index].elevation_max_dm = M_TO_DM((int16_t)(masque_voronoi[index] * ZYN_WORLD_Y_MAX));
+                map[index].chunk_x = x;
+                map[index].chunk_z = z;
+            }
+        }
+        free(masque_voronoi);
+        test_config->early_exit=1;
+        return; /* COURT-CIRCUIT : On ne fait pas le Perlin, ni le qsort */
+    }
 
     size_t total_cases = (size_t)width_x * (size_t)depth_z;
     float* hauteurs_triees = (float*)malloc(total_cases * sizeof(float));
@@ -277,16 +316,34 @@ void zyn_gen_map_relief_smooth_coastlines(MacroChunk* map, int32_t width_x, int3
 /* =============================================================================
  * POINT D'ENTRÉE DU MODULE : NOMBRE D'ÎLES ET VARIATION TOTALE
  * ============================================================================= */
-void zyn_gen_map_relief(MacroChunk* map, int32_t width_x, int32_t depth_z, uint32_t seed) {
+void zyn_gen_map_relief(MacroChunk* map, int32_t width_x, int32_t depth_z, uint32_t seed, ZynTestConfig* test_config) {
     if (map == NULL || width_x <= 0 || depth_z <= 0) return;
     zyn_noise_init(seed);
-    /* Nombre d'îles aléatoire et déterministe entre 5 et 15 basé sur la seed */
-    int32_t num_islands = 1 + (int32_t)((seed ^ 0x5F3759DF) % 5);
+    
+    double surface = (double)width_x * (double)depth_z;
+    double base_iles = surface / 333333.33;
+    if (base_iles < 1.0) base_iles = 1.0;
+
+    /* 2. EXTRACTION D'UN FLOTTANT DETERMINISTE ENTRE -1.0f ET +1.0f VIA LA SEED */
+    /* On utilise un mix par décalage pour briser les régularités de la seed */
+    uint32_t hash = (seed ^ 0x5F3759DF) * 1103515245 + 12345;
+    /* On ramène le hash entre 0.0f et 2.0f, puis on soustrait 1.0f pour avoir entre -1.0f et 1.0f */
+    float alea_flottant = ((float)(hash % 2000) / 1000.0f) - 1.0f;
+
+    /* 3. APPLICATION DE LA VARIATION DE +/- 30% */
+    float variation = (float)base_iles * 0.30f * alea_flottant;
+    int32_t num_islands = (int32_t)roundf((float)base_iles + variation);
+    
+    /* Sécurité absolue : au moins 1 île */
+    if (num_islands < 1) num_islands = 1;
+
+    printf("[RELIEF] Surface : %.0f Macro-Chunks | Base théorique : %.2f îles\n", surface, base_iles);
+    printf("[RELIEF] Squelette de Voronoi initialisé déterministement avec %d centres d'îles (Variation: %.2f).\n", num_islands, variation);
     
     float max_sea_percentage = 0.45f; /* Ton ratio cible de 45% de mer */
 
     /* Lancement de l'archipel avec transmission de la seed */
-    zyn_gen_map_relief_archipelago(map, width_x, depth_z, num_islands, max_sea_percentage, seed);
+    zyn_gen_map_relief_archipelago(map, width_x, depth_z, num_islands, max_sea_percentage, seed,test_config);
 
     /* Lissage final des traits de côtes */
     zyn_gen_map_relief_smooth_coastlines(map, width_x, depth_z, 2);

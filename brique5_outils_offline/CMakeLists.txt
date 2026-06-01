@@ -21,8 +21,12 @@ add_library(zyn_procedural_offline STATIC
     src/macro_procedural/zyn_gen_map_river.h
     src/macro_procedural/zyn_gen_map_biome.c
     src/macro_procedural/zyn_gen_map_biome.h
+    src/macro_procedural/zyn_gen_map_macro.c
+    src/macro_procedural/zyn_gen_map_macro.h
     src/macro_procedural/zyn_gen_png.c
     src/macro_procedural/zyn_gen_png.h
+    src/macro_procedural/zyn_test_framework.c
+    src/macro_procedural/zyn_test_framework.h
 )
 
 # Indiquer à CMake où trouver les en-têtes locaux de la brique procédurale
@@ -52,22 +56,6 @@ target_link_libraries(zyn_test_noise
 # Dossier de sortie du binaire de stress-test
 set_target_properties(zyn_test_noise PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/brique5_outils_offline"
-)
-
-
-# =============================================================================
-# EXÉCUTABLE 2 : PIPELINE DE GÉNÉRATION MONDIAL GLOBAL (zyn_gen_map_relief)
-# =============================================================================
-add_executable(zyn_gen_map_macro 
-    src/macro_procedural/zyn_gen_map_macro.c
-)
-
-# Liaison avec notre bibliothèque géomorphologique complète, l'include global et la lib m
-target_link_libraries(zyn_gen_map_macro 
-    PRIVATE 
-        zyn_procedural_offline
-        zynthar_shared
-        m
 )
 
 # =============================================================================
@@ -111,9 +99,10 @@ add_executable(zyn_test_gen_river src/macro_procedural/zyn_test_gen_river.c)
 target_link_libraries(zyn_test_gen_river PRIVATE zyn_procedural_offline zynthar_shared m)
 set_target_properties(zyn_test_gen_river PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/brique5_outils_offline")
 
+# Stress-test unitaire des rivières
+add_executable(zyn_test src/macro_procedural/zyn_test.c)
+target_link_libraries(zyn_test PRIVATE zyn_procedural_offline zynthar_shared m)
+set_target_properties(zyn_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/brique5_outils_offline")
 
-# Dossier de sortie du binaire du pipeline de génération de monde
-set_target_properties(zyn_gen_map_macro PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/brique5_outils_offline"
-)
+
 
