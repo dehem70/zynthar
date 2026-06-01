@@ -48,7 +48,7 @@ int main(int argc, char** argv) {
     config.active_test = 1;   
     config.target_step = 1;
     config.stress_runs = 20;  
-    config.early_exit = 1;
+    config.early_exit = 0;
     /* Documentation des target_step
         1 : Génération carte avec voronoi
         
