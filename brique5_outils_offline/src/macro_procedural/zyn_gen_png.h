@@ -18,7 +18,7 @@
  * @param filename_bin Chemin du fichier PNG du masque binaire (ex: "carte_masque_mer.png").
  * @return int 1 si les fichiers ont été écrits avec succès, 0 en cas d'échec.
  */
-int zyn_gen_png_elevation(const MacroChunk* map, int32_t width_x, int32_t depth_z, const char* filename, const char* filename_bin);
+int zyn_gen_png_elevation(const MacroChunk* map, int32_t width_x, int32_t depth_z, const char* filename);
 
 /**
  * @brief Exporte la carte des températures macro en une image PNG en niveaux de gris.

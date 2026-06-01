@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <math.h>
 
+#define ZYN_INDEX(x, z, width) (((size_t)(z) * (size_t)(width)) + (size_t)(x))
+
 // --- Configurations des bases de Données ---
 #define ZYN_DB_EMPLACEMENT      "data/"
 #define ZYN_DB_WORLD            "zyn-world.db"
@@ -11,8 +13,9 @@
 #define ZYN_DB_DELTA            "zyn-delta.db"
 
 // --- Paramètres de l'Univers de Zynthar (Alignement Voxel / Chunk Parfait) ---
-#define ZYN_WORLD_X_MAX         1000960  // Longueur : 1000.96 km (39100 Micro-Chunks)
-#define ZYN_WORLD_Z_MAX         500224   // Largeur : 500.224 km   (19540 Micro-Chunks)
+#define ZYN_WORLD_X_MAX         1024256  // Longueur : 1000.96 km (39100 Micro-Chunks)
+#define ZYN_WORLD_Z_MAX         512256   // Largeur : 500.224 km   (19540 Micro-Chunks)
+
 #define ZYN_WORLD_Y_MIN         -1024    // Profondeur max : -1024 m (Exactement 40 Micro-Chunks sous Y=0)
 #define ZYN_WORLD_Y_MAX         2048     // Hauteur max : +2048 m     (Exactement 80 Micro-Chunks au-dessus de Y=0)
 #define ZYN_SEA_LEVEL           0        // Niveau de la mer = Frontière stricte de Chunk

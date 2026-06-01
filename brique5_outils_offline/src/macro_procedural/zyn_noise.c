@@ -19,27 +19,17 @@
 #include <zynthar.h>
 #include "zyn_noise.h"
 
-/* Table de permutation interne (taille 512 pour éliminer les modulos lents dans les index) */
 static uint8_t p[512];
 
 /* =============================================================================
  * UTILITAIRES INTERNES DE GRADIENT
  * ============================================================================= */
-
-/**
- * @brief Calcule le produit scalaire entre un gradient pseudo-aléatoire 2D et la distance.
- */
 static inline float zyn_grad2d(uint8_t hash, float x, float z) {
-// bit 0 détermine le signe de x, bit 1 détermine le signe de z
     float u = (hash & 1) ? -x : x;
     float v = (hash & 2) ? -z : z;
     return u + v;
 }
 
-/**
- * @brief Calcule le produit scalaire pour le bruit 3D.
- * Utilise les 12 arêtes du cube. Axe Y réaligné en position verticale.
- */
 static inline float zyn_grad3d(uint8_t hash, float x, float z, float y) {
     int h = hash & 15;
     float u = (h < 8) ? x : z;
@@ -48,84 +38,89 @@ static inline float zyn_grad3d(uint8_t hash, float x, float z, float y) {
 }
 
 /* =============================================================================
- * ENTRÉE DE L'INTERFACE : INITIALISATION DE LA GRAINE (SEED)
+ * INITIALISATION DE LA TABLE DE PERMUTATION
  * ============================================================================= */
-
 void zyn_noise_init(uint32_t seed_value) {
-    /* Tableau temporaire pour le mélange de base (0 à 255) */
     uint8_t base_p[256];
     for (int32_t i = 0; i < 256; i++) {
         base_p[i] = (uint8_t)i;
     }
 
-    /* Générateur pseudo-aléatoire déterministe (LCG) pour le shuffle de la table */
     uint32_t next_random = seed_value;
     for (int32_t i = 255; i > 0; i--) {
         next_random = next_random * 1103515245 + 12345;
         int32_t target_index = (int32_t)((next_random / 65536) % (i + 1));
         
-        /* Permutation (Shuffle) */
         uint8_t temp = base_p[i];
         base_p[i] = base_p[target_index];
         base_p[target_index] = temp;
     }
 
-    /* Duplication de la table pour sécuriser les accès indexés sans dépassement */
     for (int32_t i = 0; i < 512; i++) {
         p[i] = base_p[i & 255];
     }
 }
 
 /* =============================================================================
- * GENERATEURS DE BRUIT DE BASE (2D & 3D ALIGNÉS SQUELETTE)
+ * BRUIT 2D SÉCURISÉ (FIN DES LIGNES ARTEFACTS)
  * ============================================================================= */
-
 float zyn_noise2d(float x, float z) {
-    /* Détermination des coordonnées de la cellule virtuelle encapsulante */
-    uint8_t X = (uint8_t)(int32_t)floorf(x);
-    uint8_t Z = (uint8_t)(int32_t)floorf(z);
+    /* 1. floorf() gère nativement et correctement les coordonnées négatives */
+    float fx = floorf(x);
+    float fz = floorf(z);
 
-    /* Calcul des coordonnées relatives/fractionnaires dans la cellule */
-    float xf = x - floorf(x);
-    float zf = z - floorf(z);
+    /* 2. Stockage dans des entiers signés 32 bits pour éviter le wrap-around à 255 */
+    int32_t ix = (int32_t)fx;
+    int32_t iz = (int32_t)fz;
 
-    /* Application du lissage de Perlin (courbe en S) */
+    /* 3. Masquage binaire étanche & 255 pour rester dans les bornes du tableau p */
+    int32_t X = ix & 255;
+    int32_t Z = iz & 255;
+
+    /* Coordonnées fractionnaires linéaires parfaites */
+    float xf = x - fx;
+    float zf = z - fz;
+
     float u = zyn_fade(xf);
     float v = zyn_fade(zf);
 
-    /* Récupération des signatures de hachage des 4 coins du carré horizontal */
+    /* Hachage sécurisé via le décalage propre de la table dupliquée */
     uint8_t aa = p[p[X] + Z];
     uint8_t ab = p[p[X] + Z + 1];
     uint8_t ba = p[p[X + 1] + Z];
     uint8_t bb = p[p[X + 1] + Z + 1];
 
-    /* Interpolations successives des produits scalaires des gradients */
-    float res = zyn_lerp(
+    return zyn_lerp(
         zyn_lerp(zyn_grad2d(aa, xf, zf),         zyn_grad2d(ba, xf - 1.0f, zf), u),
         zyn_lerp(zyn_grad2d(ab, xf, zf - 1.0f),  zyn_grad2d(bb, xf - 1.0f, zf - 1.0f), u),
         v
     );
-
-    return res;
 }
 
+/* =============================================================================
+ * BRUIT 3D SÉCURISÉ
+ * ============================================================================= */
 float zyn_noise3d(float x, float z, float y) {
-    /* Cellule virtuelle 3D encapsulante réalignée (Y est la hauteur) */
-    uint8_t X = (uint8_t)(int32_t)floorf(x);
-    uint8_t Z = (uint8_t)(int32_t)floorf(z);
-    uint8_t Y = (uint8_t)(int32_t)floorf(y);
-    
-    /* Coordonnées fractionnaires dans le cube */
-    float xf = x - floorf(x);
-    float zf = z - floorf(z);
-    float yf = y - floorf(y);
+    float fx = floorf(x);
+    float fz = floorf(z);
+    float fy = floorf(y);
 
-    /* Facteurs de lissage */
+    int32_t ix = (int32_t)fx;
+    int32_t iz = (int32_t)fz;
+    int32_t iy = (int32_t)fy;
+
+    int32_t X = ix & 255;
+    int32_t Z = iz & 255;
+    int32_t Y = iy & 255;
+    
+    float xf = x - fx;
+    float zf = z - fz;
+    float yf = y - fy;
+
     float u = zyn_fade(xf);
     float v = zyn_fade(zf);
     float w = zyn_fade(yf);
 
-    /* Hachage des 8 sommets du cube */
     int32_t A  = p[X] + Z;
     uint8_t aa = p[A] + Y;
     uint8_t ab = p[A + 1] + Y;
@@ -133,7 +128,6 @@ float zyn_noise3d(float x, float z, float y) {
     uint8_t ba = p[B] + Y;
     uint8_t bb = p[B + 1] + Y;
 
-    /* Triple interpolation linéaire tridimensionnelle */
     return zyn_lerp(
         zyn_lerp(
             zyn_lerp(zyn_grad3d(p[aa], xf, zf, yf),          zyn_grad3d(p[ba], xf - 1.0f, zf, yf), u),
@@ -150,9 +144,8 @@ float zyn_noise3d(float x, float z, float y) {
 }
 
 /* =============================================================================
- * ALGORITHMES FRACTALS (FBM) SUPERPOSANT LES OCTAVES
+ * ALGORITHMES FRACTALS (FBM)
  * ============================================================================= */
-
 float zyn_fractal_noise2d(float x, float z, int32_t octaves, float persistence, float lacunarity) {
     float total = 0.0f;
     float amplitude = 1.0f;

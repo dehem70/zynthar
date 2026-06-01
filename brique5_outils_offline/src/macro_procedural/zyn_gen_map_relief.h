@@ -31,7 +31,7 @@ void zyn_gen_map_relief_free(MacroChunk* map);
  * @param depth_z Longueur longitudinale de la carte (Axe Z).
  * @param num_islands Nombre d'îles à positionner.
  */
-float* zyn_gen_map_relief_voronoi(int32_t width_x, int32_t depth_z, int32_t num_islands); 
+float* zyn_gen_map_relief_voronoi(int32_t width_x, int32_t depth_z, int32_t num_islands, uint32_t seed); 
 
 /**
  * @brief Combine le relief fractal et le masque de Voronoi pour sculpter l'archipel
@@ -42,7 +42,7 @@ float* zyn_gen_map_relief_voronoi(int32_t width_x, int32_t depth_z, int32_t num_
  * @param num_islands Nombre d'îles.
  * @param max_sea_percentage Proportion cible de l'eau (ex: 0.45f pour 45%).
  */
-void zyn_gen_map_relief_archipelago(MacroChunk* map, int32_t width_x, int32_t depth_z, int32_t num_islands, float max_sea_percentage);
+void zyn_gen_map_relief_archipelago(MacroChunk* map, int32_t width_x, int32_t depth_z, int32_t num_islands, float max_sea_percentage, uint32_t seed);
 
 /**
  * @brief Applique un automate cellulaire (Voisinage de Moore) pour nettoyer et
@@ -53,5 +53,7 @@ void zyn_gen_map_relief_archipelago(MacroChunk* map, int32_t width_x, int32_t de
  * @param iterations Nombre de passes de lissage (ex: 3).
  */
 void zyn_gen_map_relief_smooth_coastlines(MacroChunk* map, int32_t width_x, int32_t depth_z, int32_t iterations);
+
+void zyn_gen_map_relief(MacroChunk* map, int32_t width_x, int32_t depth_z, uint32_t seed);
 
 #endif /* ZYN_GEN_MAP_RELIEF_H */

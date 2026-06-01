@@ -57,7 +57,7 @@ int main(void) {
     assert(map != NULL);
 
     zyn_noise_init(SEED_MONDE);
-    zyn_gen_map_relief_archipelago(map, width_x, depth_z, 4, 0.55f);
+    zyn_gen_map_relief_archipelago(map, width_x, depth_z, 4, 0.55f,SEED_MONDE);
     zyn_gen_map_temperature(map, width_x, depth_z);
     zyn_gen_map_humidity(map, width_x, depth_z);
     PRINT_BOTH("OK.\n");

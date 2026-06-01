@@ -11,311 +11,81 @@
  *
  * =============================================================================*/
 
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include <stb_image_write.h>
-
-#include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <stdint.h>
 #include <math.h>
-
 #include <zynthar.h>
 #include "zyn_gen_png.h"
-#include "zyn_gen_wind_global.h"
 
-
-/* =============================================================================
- * EXPORTATION DE LA CARTE DE RELIEF (NIVEAU DE GRIS & MASQUE TERRE/MER)
- * ============================================================================= */
-
-int zyn_gen_png_elevation(const MacroChunk* map, int32_t width_x, int32_t depth_z, const char* filename, const char* filename_bin) {
-    if (map == NULL || width_x <= 0 || depth_z <= 0 || filename == NULL || filename_bin == NULL) return 0;
-
-    size_t total_pixels = (size_t)width_x * (size_t)depth_z;
-    
-    /* Allocation des buffers d'images (1 canal de gris = 1 octet par pixel) */
-    uint8_t* pixels = (uint8_t*)malloc(total_pixels * sizeof(uint8_t));
-    uint8_t* pixels_bin = (uint8_t*)malloc(total_pixels * sizeof(uint8_t));
-    if (pixels == NULL || pixels_bin == NULL) {
-        free(pixels);
-        free(pixels_bin);
-        return 0;
-    }
-
-    /* Plage dynamique d'étalement pour le rendu visuel (en mètres physiques) */
-    const float alt_min_rendu = ZYN_WORLD_Y_MIN;
-    const float alt_max_rendu = ZYN_WORLD_Y_MAX;
-    const float range_rendu = alt_max_rendu - alt_min_rendu;
-
-    for (size_t i = 0; i < total_pixels; i++) {
-        /* 1. Décompression de l'altitude du chunk (décimètres -> mètres) */
-        float alt_m = DM_TO_M(map[i].elevation_max_dm);
-
-        /* 2. Clamping visuel strict pour calibrer la dynamique du niveau de gris */
-        if (alt_m < alt_min_rendu) alt_m = alt_min_rendu;
-        if (alt_m > alt_max_rendu) alt_m = alt_max_rendu;
-
-        /* 3. Normalisation linéaire entre [0.0f, 1.0f] puis passage sur 8 bits [0, 255] */
-        float normalisee = (alt_m - alt_min_rendu) / range_rendu;
-        pixels[i] = (uint8_t)(normalisee * 255.0f);
-
-        /* 4. [OPTI Branchless] Génération du masque binaire terre/mer
-         * On utilise le signe de l'altitude packagée : 
-         * Si max_elevation > 0 (terre), la condition vaut 1, le pixel prend 255 (blanc).
-         * Si max_elevation <= 0 (mer), la condition vaut 0, le pixel prend 0 (noir). */
-        pixels_bin[i] = (map[i].elevation_max_dm > ZYN_SEA_LEVEL) ? 255 : 0;
-    }
-
-    /* Écriture des deux fichiers PNG via STB
-       Le paramètre '1' indique un canal unique (Grayscale).
-       Le dernier paramètre correspond au stride (largeur de ligne en octets, ici width_x * 1). */
-    int resultat = stbi_write_png(filename, width_x, depth_z, 1, pixels, width_x);
-    int resultat_bin = stbi_write_png(filename_bin, width_x, depth_z, 1, pixels_bin, width_x);
-    
-    /* Libération propre des buffers */
-    free(pixels);
-    free(pixels_bin);
-    
-    /* Retourne 1 uniquement si les deux fichiers ont été écrits avec succès sur le disque */
-    return (resultat && resultat_bin);
-}
+// On suppose que la lib stb est incluse via ton implémentation locale
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h" 
 
 /* =============================================================================
- * EXPORTATION DE LA CARTE DE TEMPERATURE (COPIE BRUTE ZERO-CONVERSION)
+ * RENDU DU RELIEF (1 Canal - Niveaux de gris)
  * ============================================================================= */
+int zyn_gen_png_elevation(const MacroChunk* map, int32_t width_x, int32_t depth_z, const char* filename) {
+if (map == NULL || width_x <= 0 || depth_z <= 0 || filename == NULL) return 0;
 
-int zyn_gen_png_temperature(const MacroChunk* map, int32_t width_x, int32_t depth_z, const char* filename) {
-    if (map == NULL || width_x <= 0 || depth_z <= 0 || filename == NULL) return 0;
-    
     size_t total_pixels = (size_t)width_x * (size_t)depth_z;
     uint8_t* pixels = (uint8_t*)malloc(total_pixels * sizeof(uint8_t));
     if (pixels == NULL) return 0;
 
-    /* [OPTI Maximale] La température étant déjà encodée sur un octet natif uint8_t [0, 255],
-     * il n'y a plus aucun calcul de conversion ni flottant à traiter. 
-     * C'est un simple streaming de données direct depuis la RAM. */
+    const float alt_min = (float)ZYN_WORLD_Y_MIN;
+    const float alt_max = (float)ZYN_WORLD_Y_MAX;
+    const float range = alt_max - alt_min;
+
+    /* RECONSTRUCTION EN DOUBLE BOUCLE 2D EXPLICITE POUR EVITER TOUT ARRONDI ASYMETRIQUE CENTRAL */
+    for (int32_t z = 0; z < depth_z; z++) {
+        size_t offset_ligne = (size_t)z * (size_t)width_x;
+        for (int32_t x = 0; x < width_x; x++) {
+            size_t index = ZYN_INDEX(x, z, width_x);
+
+            /* Récupération et conversion ultra-sécurisée */
+            float alt_m = (float)map[index].elevation_max_dm / 10.0f;
+            
+            /* Normalisation avec protection stricte des bornes */
+            float normalisee = (alt_m - alt_min) / range;
+            if (normalisee > 1.0f) normalisee = 1.0f;
+            if (normalisee < 0.0f) normalisee = 0.0f;
+
+            /* Utilisation de lrintf pour un arrondi bancaire stable au niveau des bits du CPU */
+            int32_t pixel_val = lrintf(normalisee * 255.0f);
+            if (pixel_val < 0)   pixel_val = 0;
+            if (pixel_val > 255) pixel_val = 255;
+
+            pixels[index] = (uint8_t)pixel_val;
+        }
+    }
+
+    /* Encodage PNG brut sans contrainte de stride */
+    int resultat = stbi_write_png(filename, width_x, depth_z, 1, pixels, 0);
+    free(pixels);
+    return resultat;
+}
+/* =============================================================================
+ * RENDU DE LA TEMPERATURE (1 Canal - Niveaux de gris)
+ * ============================================================================= */
+int zyn_gen_png_temperature(const MacroChunk* map, int32_t width_x, int32_t depth_z, const char* filename) {
+    if (map == NULL || width_x <= 0 || depth_z <= 0 || filename == NULL) return 0;
+
+    size_t total_pixels = (size_t)width_x * (size_t)depth_z;
+    uint8_t* pixels = (uint8_t*)malloc(total_pixels * sizeof(uint8_t));
+    if (pixels == NULL) return 0;
+
     for (size_t i = 0; i < total_pixels; i++) {
         pixels[i] = map[i].temperature_raw;
     }
 
-    int resultat = stbi_write_png(filename, width_x, depth_z, 1, pixels, width_x);
-    
-    free(pixels);
-    return resultat;
-}
-
-
-/* =============================================================================
- * UTILITAIRE DE TRACÉ DE LIGNE EN RAM (ALGORITHME DE BRESENHAM)
- * ============================================================================= */
-static void zyn_draw_line(uint8_t* pixels, int32_t w, int32_t h, int32_t x0, int32_t z0, int32_t x1, int32_t z1, uint8_t couleur) {
-    int32_t dx = abs(x1 - x0);
-    int32_t dz = abs(z1 - z0);
-    int32_t sx = (x0 < x1) ? 1 : -1;
-    int32_t sz = (z0 < z1) ? 1 : -1;
-    int32_t err = dx - dz;
-
-    while (1) {
-        /* Protection stricte contre les débordements de lignes ou d'image */
-        if (x0 >= 0 && x0 < w && z0 >= 0 && z0 < h) {
-            pixels[z0 * w + x0] = couleur;
-        }
-
-        if (x0 == x1 && z0 == z1) break;
-        int32_t e2 = 2 * err;
-        if (e2 > -dz) {
-            err -= dz;
-            x0 += sx;
-        }
-        if (e2 < dx) {
-            err += dx;
-            z0 += sz;
-        }
-    }
-}
-
-/* =============================================================================
- * EXPORTATION DU QUIVER PLOT : GRILLE DE FLÈCHES VECTORIELLES
- * ============================================================================= */
-int zyn_gen_png_wind_vectors(const MacroChunk* map, int32_t width_x, int32_t depth_z, const char* filename) {
-    if (map == NULL || width_x <= 0 || depth_z <= 0 || filename == NULL) return 0;
-
-    size_t total_pixels = (size_t)width_x * (size_t)depth_z;
-    uint8_t* pixels = (uint8_t*)malloc(total_pixels * sizeof(uint8_t));
-    if (pixels == NULL) return 0;
-
-    const float vitesse_max_macro = 90.0f;
-
-    /* 1. PREMIÈRE PASSE : Génération du fond de carte standard en niveaux de gris (vitesse) */
-    for (size_t i = 0; i < total_pixels; i++) {
-        WindVector vent = get_global_wind(map[i].chunk_x, map[i].chunk_z);
-        float vitesse = sqrtf(vent.dx * vent.dx + vent.dy * vent.dy);
-        
-        float normalisee = vitesse / vitesse_max_macro;
-        if (normalisee > 1.0f) normalisee = 1.0f;
-        if (normalisee < 0.0f) normalisee = 0.0f;
-
-        /* On assombrit légèrement le fond de carte (multiplié par 0.5) 
-         * pour que nos flèches vectorielles blanches ressortent par contraste */
-        pixels[i] = (uint8_t)(normalisee * 255.0f * 0.5f);
-    }
-
-    /* 2. DEUXIÈME PASSE : Tracé de la grille de flèches sous-échantillonnée */
-    const int32_t grille_pas = 16;      /* On dessine une flèche tous les 16 macro-chunks */
-    const float longueur_max_fleche = 12.0f; /* Longueur maximale d'un vecteur en pixels */
-
-    for (int32_t z = grille_pas / 2; z < depth_z; z += grille_pas) {
-        for (int32_t x = grille_pas / 2; x < width_x; x += grille_pas) {
-            size_t idx = (size_t)z * width_x + x;
-            
-            /* Échantillonnage du vecteur physique au centre de la cellule */
-            WindVector vent = get_global_wind(map[idx].chunk_x, map[idx].chunk_z);
-            float vitesse = sqrtf(vent.dx * vent.dx + vent.dy * vent.dy);
-
-            if (vitesse < 1.0f) continue; /* On saute le tracé si c'est le calme plat */
-
-            /* Calcul de la longueur de la flèche proportionnelle à la force du vent */
-            float ratio_force = vitesse / vitesse_max_macro;
-            if (ratio_force > 1.0f) ratio_force = 1.0f;
-            float len = ratio_force * longueur_max_fleche;
-
-            /* Direction normalisée du vecteur */
-            float vx_norm = vent.dx / vitesse;
-            float vz_norm = vent.dy / vitesse; // Équivalent vertical pour la carte 2D
-
-            /* Coordonnées de départ (centre de la maille de la grille) */
-            int32_t x_start = x;
-            int32_t z_start = z;
-
-            /* Coordonnées d'arrivée (pointe du vecteur de vent) */
-            int32_t x_end = x + (int32_t)roundf(vx_norm * len);
-            int32_t z_end = z + (int32_t)roundf(vz_norm * len);
-
-            /* Tracé du corps du vecteur (segment blanc éclatant 255) */
-            zyn_draw_line(pixels, width_x, depth_z, x_start, z_start, x_end, z_end, 255);
-
-            /* Tracé des deux ardillons de la pointe de la flèche (calcul trigonométrique léger) */
-            // Angle opposé à la direction de la flèche + ou - 45 degrés (0.707)
-            float t_angle = 2.5f; /* Taille de la tête de flèche en pixels */
-            
-            // Rotation gauche de la pointe
-            int32_t x_arrow1 = x_end - (int32_t)roundf((vx_norm * 0.707f - vz_norm * 0.707f) * t_angle);
-            int32_t z_arrow1 = z_end - (int32_t)roundf((vz_norm * 0.707f + vx_norm * 0.707f) * t_angle);
-            zyn_draw_line(pixels, width_x, depth_z, x_end, z_end, x_arrow1, z_arrow1, 255);
-
-            // Rotation droite de la pointe
-            int32_t x_arrow2 = x_end - (int32_t)roundf((vx_norm * 0.707f + vz_norm * 0.707f) * t_angle);
-            int32_t z_arrow2 = z_end - (int32_t)roundf((vz_norm * 0.707f - vx_norm * 0.707f) * t_angle);
-            zyn_draw_line(pixels, width_x, depth_z, x_end, z_end, x_arrow2, z_arrow2, 255);
-        }
-    }
-
-    /* Écriture finale de l'image composites sur le disque */
-    int resultat = stbi_write_png(filename, width_x, depth_z, 1, pixels, width_x);
-    free(pixels);
-
-    return resultat;
-}
-
-/* =============================================================================
- * EXPORTATION DU QUIVER PLOT DU VENT LOCAL (VECTEURS + ARRIÈRE-PLAN TOPOGRAPHIQUE)
- * ============================================================================= */
-int zyn_gen_png_wind_local_vectors(const MacroChunk* map, int32_t width_x, int32_t depth_z, const char* filename) {
-    if (map == NULL || width_x <= 0 || depth_z <= 0 || filename == NULL) return 0;
-
-    // Inclusion tardive locale pour éviter les inclusions circulaires d'en-têtes
-    extern WindVector zyn_gen_map_wind_local(const MacroChunk* map, int32_t width_x, int32_t depth_z, int32_t chunk_x, int32_t chunk_z);
-
-    size_t total_pixels = (size_t)width_x * (size_t)depth_z;
-    uint8_t* pixels = (uint8_t*)malloc(total_pixels * sizeof(uint8_t));
-    if (pixels == NULL) return 0;
-
-    /* Constantes de rendu de l'univers physique */
-    const float alt_min_rendu = ZYN_WORLD_Y_MIN;
-    const float range_rendu = (float)ZYN_WORLD_Y_MAX - alt_min_rendu;
-    const float vitesse_max_local = 140.0f; /* Plafond configuré du vent local */
-
-    /* 1. PREMIÈRE PASSE : Génération du relief amorti en arrière-plan */
-    for (size_t i = 0; i < total_pixels; i++) {
-        float alt_m = DM_TO_M(map[i].elevation_max_dm);
-        if (alt_m < alt_min_rendu) alt_m = alt_min_rendu;
-        if (alt_m > (float)ZYN_WORLD_Y_MAX) alt_m = (float)ZYN_WORLD_Y_MAX;
-
-        float normalisee = (alt_m - alt_min_rendu) / range_rendu;
-        
-        /* Amortissement du fond (multiplié par 0.4) pour que les flèches ressortent parfaitement */
-        pixels[i] = (uint8_t)(normalisee * 255.0f * 0.4f);
-    }
-
-    /* 2. DEUXIÈME PASSE : Échantillonnage et tracé de la grille de flèches altérées */
-    const int32_t grille_pas = 16;           /* Densité de la grille */
-    const float longueur_max_fleche = 12.0f; /* Longueur maximale en pixels */
-
-    for (int32_t z = grille_pas / 2; z < depth_z; z += grille_pas) {
-        for (int32_t x = grille_pas / 2; x < width_x; x += grille_pas) {
-            size_t idx = (size_t)z * width_x + x;
-            
-            /* Échantillonnage du vent LOCAL (Topographique) */
-            WindVector vent = zyn_gen_map_wind_local(map, width_x, depth_z, map[idx].chunk_x, map[idx].chunk_z);
-            float vitesse = sqrtf(vent.dx * vent.dx + vent.dy * vent.dy);
-
-            if (vitesse < 1.0f) continue; /* Calme plat, pas de flèche */
-
-            /* Calcul de la longueur proportionnelle à la force locale */
-            float ratio_force = vitesse / vitesse_max_local;
-            if (ratio_force > 1.0f) ratio_force = 1.0f;
-            float len = ratio_force * longueur_max_fleche;
-
-            float vx_norm = vent.dx / vitesse;
-            float vz_norm = vent.dy / vitesse;
-
-            int32_t x_start = x;
-            int32_t z_start = z;
-            int32_t x_end = x + (int32_t)roundf(vx_norm * len);
-            int32_t z_end = z + (int32_t)roundf(vz_norm * len);
-
-            /* Tracé du segment de flux principal (Blanc pur) */
-            zyn_draw_line(pixels, width_x, depth_z, x_start, z_start, x_end, z_end, 255);
-
-            /* Tracé de la tête de flèche directionnelle */
-            float t_angle = 2.5f;
-            int32_t x_arrow1 = x_end - (int32_t)roundf((vx_norm * 0.707f - vz_norm * 0.707f) * t_angle);
-            int32_t z_arrow1 = z_end - (int32_t)roundf((vz_norm * 0.707f + vx_norm * 0.707f) * t_angle);
-            zyn_draw_line(pixels, width_x, depth_z, x_end, z_end, x_arrow1, z_arrow1, 255);
-
-            int32_t x_arrow2 = x_end - (int32_t)roundf((vx_norm * 0.707f + vz_norm * 0.707f) * t_angle);
-            int32_t z_arrow2 = z_end - (int32_t)roundf((vz_norm * 0.707f - vx_norm * 0.707f) * t_angle);
-            zyn_draw_line(pixels, width_x, depth_z, x_end, z_end, x_arrow2, z_arrow2, 255);
-        }
-    }
-
-    int resultat = stbi_write_png(filename, width_x, depth_z, 1, pixels, width_x);
+    /* Même chose ici, stride à 0 */
+    int resultat = stbi_write_png(filename, width_x, depth_z, 1, pixels, 0);
     free(pixels);
     return resultat;
 }
 
 /* =============================================================================
- * EXPORTATION DE LA CARTE D'HUMIDITÉ TEMPORAIRE (STREAME BRUT DEPUIS LE BUFFER)
- * ============================================================================= */
-int zyn_gen_png_humidity(const MacroChunk* map, int32_t width_x, int32_t depth_z, const char* filename) {
-    if (map == NULL || width_x <= 0 || depth_z <= 0 || filename == NULL) return 0;
-    
-    size_t total_pixels = (size_t)width_x * (size_t)depth_z;
-    uint8_t* pixels = (uint8_t*)malloc(total_pixels * sizeof(uint8_t));
-    if (pixels == NULL) return 0;
-
-    /* On lit directement l'octet brut temporaire stocké dans map[i].biome */
-    for (size_t i = 0; i < total_pixels; i++) {
-        pixels[i] = map[i].biome;
-    }
-
-    int resultat = stbi_write_png(filename, width_x, depth_z, 1, pixels, width_x);
-    free(pixels);
-    return resultat;
-}
-
-/* =============================================================================
- * EXPORTATION DE LA CARTE HYDROGRAPHIQUE À L'ÉCHELLE MACRO CHUNK
+ * RENDU DES RIVIERES ET HYDROGRAPHIE (1 Canal)
  * ============================================================================= */
 int zyn_gen_png_rivers(const MacroChunk* map, int32_t width_x, int32_t depth_z, const uint32_t* flux_grid, const char* filename) {
     if (map == NULL || width_x <= 0 || depth_z <= 0 || flux_grid == NULL || filename == NULL) return 0;
@@ -324,105 +94,69 @@ int zyn_gen_png_rivers(const MacroChunk* map, int32_t width_x, int32_t depth_z, 
     uint8_t* pixels = (uint8_t*)malloc(total_pixels * sizeof(uint8_t));
     if (pixels == NULL) return 0;
 
-    const float alt_min_rendu = ZYN_WORLD_Y_MIN;
+    const float alt_min_rendu = (float)ZYN_WORLD_Y_MIN;
     const float range_rendu = (float)ZYN_WORLD_Y_MAX - alt_min_rendu;
 
-    /* 1. Première passe : Rendu du relief de fond assombri */
     for (size_t i = 0; i < total_pixels; i++) {
         float alt_m = DM_TO_M(map[i].elevation_max_dm);
         float normalisee = (alt_m - alt_min_rendu) / range_rendu;
         if (normalisee > 1.0f) normalisee = 1.0f;
         if (normalisee < 0.0f) normalisee = 0.0f;
 
-        pixels[i] = (uint8_t)(normalisee * 255.0f * 0.15f); /* Fond feutré à 15% pour le contraste */
+        pixels[i] = (uint8_t)(normalisee * 255.0f * 0.15f); 
     }
 
-    /* 2. Deuxième passe : Superposition des cours d'eau et des surfaces de lacs */
     for (size_t i = 0; i < total_pixels; i++) {
-        /* Rendu prioritaire des lacs inondés par notre algorithme de Sink Filling */
-        if (map[i].biome == 255 && map[i].elevation_max_dm > 0) {
-            pixels[i] = 255; /* Blanc pur éclatant pour matérialiser la surface de l'eau douce */
+        if (map[i].biome == 255 || map[i].biome == 253) {
+            pixels[i] = 255; 
             continue;
         }
 
-        /* Rendu du flux linéaire des rivières classiques */
         uint32_t flux = flux_grid[i];
         if (flux > 0) {
-            /* Intensité progressive selon la taille du bassin versant collecté */
             uint32_t intensite = 130 + (flux * 4);
-            if (intensite > 240) intensite = 240; /* On sature juste en dessous du blanc du lac */
+            if (intensite > 240) intensite = 240;
             pixels[i] = (uint8_t)intensite;
         }
     }
 
-    int resultat = stbi_write_png(filename, width_x, depth_z, 1, pixels, width_x);
+    /* Stride à 0 */
+    int resultat = stbi_write_png(filename, width_x, depth_z, 1, pixels, 0);
     free(pixels);
     return resultat;
 }
 
 /* =============================================================================
- * EXPORTATION DE LA CARTE DES BIOMES EN COULEURS RGB (ÉCHELLE MACRO)
+ * RENDU COULEUR DES BIOMES (3 Canaux - RGB)
  * ============================================================================= */
 int zyn_gen_png_biomes(const MacroChunk* map, int32_t width_x, int32_t depth_z, const char* filename) {
     if (map == NULL || width_x <= 0 || depth_z <= 0 || filename == NULL) return 0;
 
     size_t total_pixels = (size_t)width_x * (size_t)depth_z;
-    /* 3 Octets par pixel pour le mode RGB pur */
     uint8_t* pixels = (uint8_t*)malloc(total_pixels * 3 * sizeof(uint8_t));
     if (pixels == NULL) return 0;
 
     for (size_t i = 0; i < total_pixels; i++) {
         size_t p_idx = i * 3;
         uint8_t b_id = map[i].biome;
-
         uint8_t r = 0, g = 0, b = 0;
 
         switch (b_id) {
-            case ZYN_BIOME_ABYSSE:
-                r = 5;   g = 15;  b = 45;   /* Bleu nuit ultra-sombre */
-                break;
-            case ZYN_BIOME_EAU_PROFONDE:
-                r = 15;  g = 40;  b = 95;   /* Bleu océan profond */
-                break;
-            case ZYN_BIOME_EAU_COTIERE:
-                r = 40;  g = 130; b = 190;  /* Cyan/Turquoise côtier */
-                break;
-            case ZYN_BIOME_EAU_INTERIEURE:
-                r = 45;  g = 100; b = 150;  /* Bleu doux pour l'eau douce des lacs */
-                break;
-            case ZYN_BIOME_PLAGE:
-                r = 230; g = 205; b = 140;  /* Jaune sable chaud */
-                break;
-            case ZYN_BIOME_DESERT:
-                r = 215; g = 155; b = 85;   /* Orange sable aride / Mesa */
-                break;
-            case ZYN_BIOME_PLAINE:
-                r = 160; g = 195; b = 105;  /* Vert prairie / Savane claire */
-                break;
-            case ZYN_BIOME_FORET:
-                r = 50;  g = 135; b = 70;   /* Vert d'arbres feuillus classique */
-                break;
-            case ZYN_BIOME_TAIGA:
-                r = 35;  g = 85;  b = 65;   /* Vert sombre bleuté de conifères */
-                break;
-            case ZYN_BIOME_TOUNDRA:
-                r = 135; g = 145; b = 130;  /* Gris-vert terne de lichen / Permafrost */
-                break;
-            case ZYN_BIOME_JUNGLE:
-                r = 10;  g = 95;  b = 40;   /* Vert émeraude tropical hyper-saturé */
-                break;
-            case ZYN_BIOME_GLACIER:
-                r = 195; g = 225; b = 235;  /* Bleu ciel très pâle glacé */
-                break;
-            case ZYN_BIOME_MONTAGNE_ROCHEUSE:
-                r = 110; g = 110; b = 115;  /* Gris rocheux de haute montagne */
-                break;
-            case ZYN_BIOME_PIC_ENNEIGE:
-                r = 245; g = 245; b = 250;  /* Blanc neige pur */
-                break;
-            default:
-                r = 0;   g = 0;   b = 0;     /* Noir par défaut (vide) */
-                break;
+            case ZYN_BIOME_ABYSSE:            r = 5;   g = 15;  b = 45;   break;
+            case ZYN_BIOME_EAU_PROFONDE:      r = 15;  g = 40;  b = 95;   break;
+            case ZYN_BIOME_EAU_COTIERE:       r = 40;  g = 130; b = 190;  break;
+            case ZYN_BIOME_EAU_INTERIEURE:    r = 45;  g = 100; b = 150;  break;
+            case ZYN_BIOME_PLAGE:             r = 230; g = 205; b = 140;  break;
+            case ZYN_BIOME_DESERT:            r = 215; g = 155; b = 85;   break;
+            case ZYN_BIOME_PLAINE:            r = 160; g = 195; b = 105;  break;
+            case ZYN_BIOME_FORET:             r = 50;  g = 135; b = 70;   break;
+            case ZYN_BIOME_TAIGA:             r = 35;  g = 85;  b = 65;   break;
+            case ZYN_BIOME_TOUNDRA:           r = 135; g = 145; b = 130;  break;
+            case ZYN_BIOME_JUNGLE:            r = 10;  g = 95;  b = 40;   break;
+            case ZYN_BIOME_GLACIER:           r = 195; g = 225; b = 235;  break;
+            case ZYN_BIOME_MONTAGNE_ROCHEUSE: r = 110; g = 110; b = 115;  break;
+            case ZYN_BIOME_PIC_ENNEIGE:       r = 245; g = 245; b = 250;  break;
+            default:                          r = 0;   g = 0;   b = 0;     break;
         }
 
         pixels[p_idx]     = r;
@@ -430,8 +164,8 @@ int zyn_gen_png_biomes(const MacroChunk* map, int32_t width_x, int32_t depth_z, 
         pixels[p_idx + 2] = b;
     }
 
-    /* stbi_write_png prend le nombre de canaux (3 pour RGB) en 4ème argument */
-    int resultat = stbi_write_png(filename, width_x, depth_z, 3, pixels, width_x * 3);
+    /* Pour le RGB à 3 canaux, passer 0 sécurise totalement l'étalement des lignes */
+    int resultat = stbi_write_png(filename, width_x, depth_z, 3, pixels, 0);
     free(pixels);
     return resultat;
 }
