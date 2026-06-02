@@ -46,11 +46,12 @@ int main(int argc, char** argv) {
     /* 2. CONFIGURATION DU DRAPEAU DE TEST POUR LE PAS 1 */
     ZynTestConfig config;
     config.active_test = 1;   
-    config.target_step = 1;
+    config.target_step = 2;
     config.stress_runs = 20;  
     config.early_exit = 0;
     /* Documentation des target_step
         1 : Génération carte avec voronoi
+        2 : injection bruit fractal
         
     */    
     uint32_t base_seeds[20] = {
@@ -102,6 +103,7 @@ int main(int argc, char** argv) {
         /* EXÉCUTION EN BOUCLE */
         for (int32_t i = 0; i < config.stress_runs; i++) {
             uint32_t current_seed = 0;
+            config.early_exit = 0;
             
             /* Si on est dans la plage des 20 premières, on prend le tableau fixe */
             if (i < 20) {
@@ -111,7 +113,7 @@ int main(int argc, char** argv) {
                 current_seed = base_seeds[i % 20] + (uint32_t)(i / 20) * 7919; 
             }
 
-            printf("[RUN %03d/%03d] Évaluation Seed: %u\n", i + 1, config.stress_runs, current_seed);
+            printf("\n[RUN %03d/%03d] Évaluation Seed: %u\n", i + 1, config.stress_runs, current_seed);
             zyn_gen_map_macro(current_seed, &config);
         }
     }

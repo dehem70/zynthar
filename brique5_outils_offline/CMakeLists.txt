@@ -28,7 +28,12 @@ add_library(zyn_procedural_offline STATIC
     src/macro_procedural/zyn_test_framework.c
     src/macro_procedural/zyn_test_framework.h
 )
-
+find_package(OpenMP REQUIRED)
+if(OpenMP_FOUND)
+    target_link_libraries(zyn_procedural_offline PRIVATE OpenMP::OpenMP_CXX)
+    # ou target_compile_options s'il s'agit de C pur :
+    target_compile_options(zyn_procedural_offline PRIVATE ${OpenMP_C_FLAGS})
+endif()
 # Indiquer à CMake où trouver les en-têtes locaux de la brique procédurale
 target_include_directories(zyn_procedural_offline PUBLIC 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/macro_procedural

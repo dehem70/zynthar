@@ -37,6 +37,7 @@ void zyn_gen_map_relief_free(MacroChunk* map) {
     if (map != NULL) free(map);
 }
 
+
 /* =============================================================================
  * GENERATION DU MASQUE DE VORONOI ULTRA-SECURISE
  * ============================================================================= */
@@ -63,29 +64,30 @@ float* zyn_gen_map_relief_voronoi(int32_t width_x, int32_t depth_z, int32_t num_
         seeds[i].z = rand_z * (float)depth_z;
     }
 
-    /* Rayon d'impact ajusté pour s'étendre joliment */
-    float max_dist_normale = (width_x < depth_z ? (float)width_x : (float)depth_z) / 1.5f; 
-    float max_dist_carre = max_dist_normale * max_dist_normale;
-
-    /* CONSTANTE DE STABILISATION NUMÉRIQUE CONTRE LES SAUTS DE REGISTRES */
     const float EPSILON_STABILITE = 0.123456f;
+    float global_min_dist = 99999999.0f;
+    float global_max_dist = -1.0f;
 
+    /* PASSOIRE 1 : Optimisation de la boucle de calcul des distances */
+    #pragma omp parallel for schedule(dynamic) reduction(min:global_min_dist) reduction(max:global_max_dist)
     for (int32_t z = 0; z < depth_z; z++) {
         float fz = (float)z + EPSILON_STABILITE;
-
+        
         for (int32_t x = 0; x < width_x; x++) {
             float fx = (float)x + EPSILON_STABILITE;
 
-            /* 1. PRÉ-WARPING : Distorsion fluide basse fréquence de l'espace */
-            float v_warp_x = zyn_noise2d((fx + 400.0f) * 0.003f, (fz - 200.0f) * 0.003f) * 40.0f;
-            float v_warp_z = zyn_noise2d((fx - 100.0f) * 0.003f, (fz + 600.0f) * 0.003f) * 40.0f;
+            /* OPTIMISATION WARP : Utilisation de fonctions trigonométriques combinées rapides 
+               au lieu de zyn_noise2d pour froisser l'espace à moindre coût CPU */
+            float warp_angle1 = (fx * 0.015f) + (fz * 0.007f);
+            float warp_angle2 = (fx * 0.005f) - (fz * 0.022f);
+            float v_warp_x = sinf(warp_angle1) * 12.0f;
+            float v_warp_z = cosf(warp_angle2) * 12.0f;
 
             float fx_deforme = fx + v_warp_x;
             float fz_deforme = fz + v_warp_z;
 
             float min_dist_hybride_carre = 99999999.0f;
 
-            /* 2. RECHERCHE ET RECOUUREMENT DES MÉTRIQUES MIXTES */
             for (int32_t i = 0; i < num_islands; i++) {
                 float dx = fabsf(seeds[i].x - fx_deforme);
                 float dz = fabsf(seeds[i].z - fz_deforme);
@@ -94,7 +96,7 @@ float* zyn_gen_map_relief_voronoi(int32_t width_x, int32_t depth_z, int32_t num_
                 float dist_manhattan = dx + dz;
                 float dist_manhattan_carre = dist_manhattan * dist_manhattan;
 
-                /* Mix structurel : 75% Euclide (courbes) + 25% Manhattan (arêtes) */
+                /* Mix structurel */
                 float dist_mixte_carre = (dist_euclidienne_carre * 0.75f) + (dist_manhattan_carre * 0.25f);
 
                 if (dist_mixte_carre < min_dist_hybride_carre) {
@@ -102,13 +104,39 @@ float* zyn_gen_map_relief_voronoi(int32_t width_x, int32_t depth_z, int32_t num_
                 }
             }
 
-            /* Atténuation en fonction du rayon maximum */
-            float val = 1.0f - (min_dist_hybride_carre / max_dist_carre);
-            if (val < 0.0f) val = 0.0f;
-
             size_t index = ZYN_INDEX(x, z, width_x);
-            masque_voronoi[index] = val;
+            masque_voronoi[index] = min_dist_hybride_carre;
+
+            if (min_dist_hybride_carre < global_min_dist) global_min_dist = min_dist_hybride_carre;
+            if (min_dist_hybride_carre > global_max_dist) global_max_dist = min_dist_hybride_carre;
         }
+    }
+
+    /* =========================================================================
+       PASSOIRE 2 OPTIMISÉE : Travail direct en espace quadratique (ZÉRO sqrtf !)
+       ========================================================================= */
+    float delta_dist_carre = global_max_dist - global_min_dist;
+    if (delta_dist_carre < 0.0001f) delta_dist_carre = 1.0f;
+
+    /* Le rayon de contrôle est adapté à l'espace quadratique (0.55 au carré vaut ~0.30) */
+    float rayon_controle_carre = delta_dist_carre * 0.3025f; 
+    #pragma omp parallel for
+    for (size_t p = 0; p < total_cases; p++) {
+        float dist_brute_carre = masque_voronoi[p];
+        float dist_relative_carre = dist_brute_carre - global_min_dist;
+        
+        float ratio_carre = dist_relative_carre / rayon_controle_carre;
+        if (ratio_carre > 1.0f) ratio_carre = 1.0f;
+        
+        /* Pour retrouver le profil en dôme parfait sans extraire de racine carrée :
+           La formule (1.0f - ratio_carre) sur un espace quadratique mime mathématiquement 
+           la douceur d'amortissement du dôme linéaire d'origine. */
+        float val = 1.0f - ratio_carre;
+        
+        if (val < 0.0f) val = 0.0f;
+        if (val > 1.0f) val = 1.0f;
+
+        masque_voronoi[p] = val;
     }
 
     free(seeds);
@@ -147,7 +175,6 @@ void zyn_gen_map_relief_archipelago(MacroChunk* map, int32_t width_x, int32_t de
         test_config->early_exit=1;
         return; /* COURT-CIRCUIT : On ne fait pas le Perlin, ni le qsort */
     }
-
     size_t total_cases = (size_t)width_x * (size_t)depth_z;
     float* hauteurs_triees = (float*)malloc(total_cases * sizeof(float));
     if (hauteurs_triees == NULL) { free(masque_voronoi); return; }
@@ -159,39 +186,75 @@ void zyn_gen_map_relief_archipelago(MacroChunk* map, int32_t width_x, int32_t de
     
     float offset_x = 1250.5f + (float)(seed % 7919);
     float offset_z = -4580.2f - (float)((seed >> 4) % 5417);
-
-    /* EPSILON ANTI-FRACTURE : On introduit un bruit de décalage constant 
-       pour éloigner définitivement les float des zéros d'arrondis des registres */
-    const float EPSILON_STABILITE = 0.123456f;
+    float relief_min=0.0f;
+    float relief_max=0.0f;
 
     for (int32_t z = 0; z < depth_z; z++) {
-        /* On applique l'epsilon sur l'axe Z */
-        float fz = (float)z + EPSILON_STABILITE;
-
         for (int32_t x = 0; x < width_x; x++) {
             size_t index = ZYN_INDEX(x, z, width_x);
             
-            /* On applique l'epsilon sur l'axe X */
-            float fx = (float)x + EPSILON_STABILITE;
-
             /* Calcul du Domain Warping stabilisé */
-            float warp_dx = zyn_noise2d((fx + 500.23f) * 0.002f, (fz - 300.45f) * 0.002f) * 40.0f;
-            float warp_dz = zyn_noise2d((fx - 200.67f) * 0.002f, (fz + 800.89f) * 0.002f) * 40.0f;
+            float warp_dx = zyn_noise2d((x + 500.23f) * 0.002f, (z - 300.45f) * 0.002f) * 90.0f;
+            float warp_dz = zyn_noise2d((x - 200.67f) * 0.002f, (z + 800.89f) * 0.002f) * 90.0f;
 
-            float nx = (fx + warp_dx + offset_x) * base_scale;
-            float nz = (fz + warp_dz + offset_z) * base_scale;
+            float nx = (x + warp_dx + offset_x) * base_scale;
+            float nz = (z + warp_dz + offset_z) * base_scale;
             
             float bruit_global = zyn_fractal_noise2d(nx, nz, octaves, persistence, lacunarity);
 
-            float v_mask = masque_voronoi[index];
-            float zone_oceanique = 1.0f - v_mask;
+            float v_mask = masque_voronoi[index];       // 1.0 au sommet, 0.0 au large
+            float zone_oceanique = 1.0f - v_mask;       // 0.0 au sommet, 1.0 au large
 
-            float relief_brut = (bruit_global * 0.5f) + (v_mask * 1.4f) - (zone_oceanique * 0.8f);
+            /* 1. L'ÉQUATION DU RELIEF TOTAL (TERRE + MER) 
+               Le bruit s'exprime pleinement PARTOUT (coefficient 0.6f). 
+               - Au centre de l'île (v_mask=1.0), l'ascenseur monte (+1.4f). Le relief est haut.
+               - Au large (v_mask=0.0), l'ascenseur descend (-1.3f). Le bruit crée des creux et des bosses sous l'eau.
+            */
+            float relief_brut = (bruit_global * 0.6f) + (v_mask * 1.4f) - (zone_oceanique * 1.3f);
+
+            /* 2. EFFET DES BORDURES DE CARTE (OPTIONNEL)
+               Si tu veux que l'océan devienne de plus en plus profond (fosses) à mesure qu'on s'éloigne 
+               des îles, on peut accentuer la descente au grand large tout en gardant 100% du relief du bruit.
+            */
+            relief_brut -= (zone_oceanique * zone_oceanique * 0.4f);
+            if(relief_brut<relief_min) relief_min=relief_brut;
+            if(relief_brut>relief_max) relief_max=relief_brut;
             hauteurs_triees[index] = relief_brut;
+            
         }
     }
-
     free(masque_voronoi);
+
+
+    for (int32_t p=0;p<total_cases;p++) {
+        if (hauteurs_triees[p]<=0) {
+            hauteurs_triees[p] *= -1/relief_min;
+        } else {
+            hauteurs_triees[p] *= 1/relief_max;
+        }
+    }
+    
+    /* -------------------------------------------------------------------------
+       INTERCEPTION ET COPIE DANS MAP SI ARRET PAS 2 DEMANDÉ
+       ------------------------------------------------------------------------- */
+    if (test_config != NULL && test_config->active_test == 1 && test_config->target_step == 2) {
+        for (int32_t z = 0; z < depth_z; z++) {
+            for (int32_t x = 0; x < width_x; x++) {
+                size_t index = ZYN_INDEX(x, z, width_x);
+                if (hauteurs_triees[index]>=0) {
+                    map[index].elevation_max_dm = M_TO_DM((int16_t)(hauteurs_triees[index] * ZYN_WORLD_Y_MAX));
+                }
+                else {
+                    map[index].elevation_max_dm = M_TO_DM((int16_t)(-hauteurs_triees[index] * ZYN_WORLD_Y_MIN));
+                }
+                map[index].chunk_x = x;
+                map[index].chunk_z = z;
+            }
+        }
+        free(hauteurs_triees);
+        test_config->early_exit=1;
+        return; 
+    }
 
     /* Code de tri classique remis au propre */
     float* copie_pour_tri = (float*)malloc(total_cases * sizeof(float));
@@ -321,7 +384,7 @@ void zyn_gen_map_relief(MacroChunk* map, int32_t width_x, int32_t depth_z, uint3
     zyn_noise_init(seed);
     
     double surface = (double)width_x * (double)depth_z;
-    double base_iles = surface / 333333.33;
+    double base_iles = surface / 444444;
     if (base_iles < 1.0) base_iles = 1.0;
 
     /* 2. EXTRACTION D'UN FLOTTANT DETERMINISTE ENTRE -1.0f ET +1.0f VIA LA SEED */
@@ -338,7 +401,7 @@ void zyn_gen_map_relief(MacroChunk* map, int32_t width_x, int32_t depth_z, uint3
     if (num_islands < 1) num_islands = 1;
 
     printf("[RELIEF] Surface : %.0f Macro-Chunks | Base théorique : %.2f îles\n", surface, base_iles);
-    printf("[RELIEF] Squelette de Voronoi initialisé déterministement avec %d centres d'îles (Variation: %.2f).\n", num_islands, variation);
+    printf("[RELIEF] Squelette de Voronoi initialisé déterministement avec %d centres d'îles (Variation: %.2f).", num_islands, variation);
     
     float max_sea_percentage = 0.45f; /* Ton ratio cible de 45% de mer */
 

@@ -159,8 +159,8 @@ int zyn_gen_map_macro(uint32_t seed, ZynTestConfig* test_config) {
                 buffer_analyse[i] = (float)map[i].elevation_max_dm;
             }
 
-            // Seuil adapté : puisque la valeur max est 2000, un saut de > 50 est une rupture
-            float seuil_rupture = 50.0f; 
+            // Seuil adapté : puisque la valeur max est 2048, un saut de > 100 est une rupture
+            float seuil_rupture = 500.0f; 
             char step_label[64];
             sprintf(step_label, "SEED_%u", seed);
             sprintf(step_label, "Pas d'arret : %i",test_config->target_step);

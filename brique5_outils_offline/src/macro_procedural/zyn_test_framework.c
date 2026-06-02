@@ -32,7 +32,13 @@ int32_t zyn_test_verify_continuity(const float* buffer, int32_t width_x, int32_t
         fprintf(stderr, "[ERR] Impossible d'allouer le buffer d'image de diagnostic.\n");
         return -1;
     }
-
+    float min_val_detecte = buffer[0];
+    float max_val_detecte = buffer[0];
+    for (size_t i = 1; i < total_cases; i++) {
+        if (buffer[i] < min_val_detecte) min_val_detecte = buffer[i];
+        if (buffer[i] > max_val_detecte) max_val_detecte = buffer[i];
+    }
+    
     /* Pointeur de fichier pour consigner la liste exacte des coordonnées des brisures */
     FILE* log_file = NULL;
     char log_filename[256];
@@ -90,19 +96,18 @@ int32_t zyn_test_verify_continuity(const float* buffer, int32_t width_x, int32_t
         fclose(log_file);
     }
 
-    /* Rapport d'audit à l'écran */
+ /* Rapport d'audit à l'écran mis à jour avec les points min/max */
     if (compteur_ruptures > 0) {
-        printf("[AUDIT CRITIQUE] Pas: %s | Seed: %u | %d ruptures détectées ! (Gradient Max: %f) -> Coordonnées sauvegardées dans %s\n", 
-               step_name, seed, compteur_ruptures, max_gradient_detecte, log_filename);
+        printf("[AUDIT CRITIQUE] Pas: %s | Seed: %u | %d ruptures ! (Min: %.1f, Max: %.1f, Grad Max: %.1f) -> Log: %s\n", 
+               step_name, seed, compteur_ruptures, min_val_detecte, max_val_detecte, max_gradient_detecte, log_filename);
         
         char img_filename[256];
         sprintf(img_filename, "audit_rupture_%s_seed_%u.png", step_name, seed);
         stbi_write_png(img_filename, width_x, depth_z, 1, gradient_pixels, 0);
     } else {
-        printf("[AUDIT OK] Pas: %s | Seed: %u | Continuité validée (Gradient Max: %f)\n", 
-               step_name, seed, max_gradient_detecte);
+        printf("[AUDIT OK] Pas: %s | Seed: %u | Continuité validée (Min: %.1f, Max: %.1f, Grad Max: %.1f)\n", 
+               step_name, seed, min_val_detecte, max_val_detecte, max_gradient_detecte);
     }
-
     free(gradient_pixels);
     return compteur_ruptures;
 }
