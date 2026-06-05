@@ -17,6 +17,7 @@
 #include <math.h>
 #include <zynthar.h>
 #include "zyn_gen_png.h"
+#include "zyn_river_agent.h"
 
 // On suppose que la lib stb est incluse via ton implémentation locale
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -85,9 +86,29 @@ int zyn_gen_png_temperature(const MacroChunk* map, int32_t width_x, int32_t dept
 }
 
 /* =============================================================================
+ * RENDU DE L'HUMIDITE (1 Canal - Niveaux de gris)
+ * ============================================================================= */
+int zyn_gen_png_humidite(const MacroChunk* map, int32_t width_x, int32_t depth_z, const char* filename) {
+    if (map == NULL || width_x <= 0 || depth_z <= 0 || filename == NULL) return 0;
+
+    size_t total_pixels = (size_t)width_x * (size_t)depth_z;
+    uint8_t* pixels = (uint8_t*)malloc(total_pixels * sizeof(uint8_t));
+    if (pixels == NULL) return 0;
+
+    for (size_t i = 0; i < total_pixels; i++) {
+        pixels[i] = map[i].biome;
+    }
+
+    /* Même chose ici, stride à 0 */
+    int resultat = stbi_write_png(filename, width_x, depth_z, 1, pixels, 0);
+    free(pixels);
+    return resultat;
+}
+
+/* =============================================================================
  * RENDU DES RIVIERES ET HYDROGRAPHIE (1 Canal)
  * ============================================================================= */
-int zyn_gen_png_rivers(const MacroChunk* map, int32_t width_x, int32_t depth_z, const uint32_t* flux_grid, const char* filename) {
+/*int zyn_gen_png_rivers(const MacroChunk* map, int32_t width_x, int32_t depth_z, const uint32_t* flux_grid, const char* filename) {
     if (map == NULL || width_x <= 0 || depth_z <= 0 || flux_grid == NULL || filename == NULL) return 0;
 
     size_t total_pixels = (size_t)width_x * (size_t)depth_z;
@@ -121,7 +142,66 @@ int zyn_gen_png_rivers(const MacroChunk* map, int32_t width_x, int32_t depth_z, 
     }
 
     /* Stride à 0 */
-    int resultat = stbi_write_png(filename, width_x, depth_z, 1, pixels, 0);
+  /*  int resultat = stbi_write_png(filename, width_x, depth_z, 1, pixels, 0);
+    free(pixels);
+    return resultat;
+}
+*/
+
+int zyn_gen_png_rivers(const MacroChunk* map, int32_t width_x, int32_t depth_z, 
+                       const ZynRiverNode* river_nodes, int32_t nodes_count, 
+                       const char* filename) 
+{
+    if (map == NULL || width_x <= 0 || depth_z <= 0 || river_nodes == NULL || filename == NULL) return 0;
+
+    size_t total_pixels = (size_t)width_x * (size_t)depth_z;
+    uint8_t* pixels = (uint8_t*)malloc(total_pixels * 3 * sizeof(uint8_t));
+    if (pixels == NULL) return 0;
+
+//    const float alt_min_rendu = (float)ZYN_WORLD_Y_MIN;
+    const float alt_min_rendu = 0;
+    const float range_rendu = (float)ZYN_WORLD_Y_MAX - alt_min_rendu;
+
+    // 1. Fond de carte
+    for (size_t i = 0; i < total_pixels; i++) {
+        size_t idx_rgb = i * 3;
+
+        if (map[i].biome == 255 || map[i].biome == 253) {
+            pixels[idx_rgb + 0] = 15;   pixels[idx_rgb + 1] = 45;   pixels[idx_rgb + 2] = 120;
+            continue;
+        }
+
+        float alt_m = DM_TO_M(map[i].elevation_max_dm);
+        float normalisee = (alt_m - alt_min_rendu) / range_rendu;
+        if (normalisee > 1.0f) normalisee = 1.0f;
+        if (normalisee < 0.0f) normalisee = 0.0f;
+
+        uint8_t facteur_relief = (uint8_t)(normalisee * 255.0f);
+        pixels[idx_rgb + 0] = (uint8_t)(30 + (facteur_relief * 0.4f));
+        pixels[idx_rgb + 1] = (uint8_t)(110 - (facteur_relief * 0.2f));
+        pixels[idx_rgb + 2] = 40;
+    }
+
+    // 2. Application des rivières extraites par-dessus
+    for (int32_t i = 0; i < nodes_count; i++) {
+        int32_t rx = river_nodes[i].macro_x;
+        int32_t rz = river_nodes[i].macro_z;
+
+        if (rx < 0 || rx >= width_x || rz < 0 || rz >= depth_z) continue;
+
+        // C'est le SEUL endroit du projet où le * 3 est légitime !
+        size_t pixel_index = ((size_t)rz * (size_t)width_x + (size_t)rx) * 3;
+
+        uint32_t flux = river_nodes[i].flow_volume;
+        uint32_t intensite_bleu = 160 + (flux / 10); // Ajustement pour éviter l'overflow visuel
+        if (intensite_bleu > 255) intensite_bleu = 255;
+
+        pixels[pixel_index + 0] = 0;
+        pixels[pixel_index + 1] = (uint8_t)(intensite_bleu - 30);
+        pixels[pixel_index + 2] = (uint8_t)intensite_bleu;
+    }
+
+    int resultat = stbi_write_png(filename, width_x, depth_z, 3, pixels, (int)(width_x * 3));
     free(pixels);
     return resultat;
 }
@@ -142,7 +222,7 @@ int zyn_gen_png_biomes(const MacroChunk* map, int32_t width_x, int32_t depth_z, 
         uint8_t r = 0, g = 0, b = 0;
 
         switch (b_id) {
-            case ZYN_BIOME_ABYSSE:            r = 5;   g = 15;  b = 45;   break;
+            case ZYN_BIOME_ABYSSE:            r = 5;   g = 15;  b = 95;   break;
             case ZYN_BIOME_EAU_PROFONDE:      r = 15;  g = 40;  b = 95;   break;
             case ZYN_BIOME_EAU_COTIERE:       r = 40;  g = 130; b = 190;  break;
             case ZYN_BIOME_EAU_INTERIEURE:    r = 45;  g = 100; b = 150;  break;

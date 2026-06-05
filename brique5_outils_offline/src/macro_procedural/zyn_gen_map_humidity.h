@@ -10,6 +10,7 @@
 
 #include <stdint.h>
 #include <zynthar.h>
+#include "zyn_test_framework.h"
 
 /**
  * @brief Calcule la carte d'humidité atmosphérique globale (pluie).
@@ -20,5 +21,5 @@
  * @param width_x Largeur transversale de la carte (Axe X).
  * @param depth_z Longueur longitudinale de la carte (Axe Z).
  */
-void zyn_gen_map_humidity(MacroChunk* map, int32_t width_x, int32_t depth_z);
+void zyn_gen_map_humidity(MacroChunk* map, int32_t width_x, int32_t depth_z,ZynTestConfig* test_config);
 #endif // ZYN_GEN_MAP_HUMIDITY_H

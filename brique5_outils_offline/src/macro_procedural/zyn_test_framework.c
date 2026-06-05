@@ -70,7 +70,7 @@ int32_t zyn_test_verify_continuity(const float* buffer, int32_t width_x, int32_t
 
                 /* Ouverture paresseuse du fichier log au premier pixel suspect trouvé */
                 if (log_file == NULL) {
-                    sprintf(log_filename, "audit_coordonnees_%s_seed_%u.log", step_name, seed);
+                    sprintf(log_filename, "audit_coordonnees_%s_seed_%u_seuil_%f.log", step_name, seed,seuil_rupture);
                     log_file = fopen(log_filename, "w");
                     if (log_file != NULL) {
                         fprintf(log_file, "# RUN REPORT: %s | SEED: %u\n", step_name, seed);

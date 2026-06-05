@@ -7,6 +7,7 @@
 // Inclusion globale gérée par CMake
 #include <zynthar.h>
 #include "zyn_test_framework.h"
+#include "zyn_utils.h"
 
 /* =============================================================================
  * INTERFACE DU GÉNÉRATEUR GÉOMORPHOLOGIQUE MACRO
@@ -53,8 +54,31 @@ void zyn_gen_map_relief_archipelago(MacroChunk* map, int32_t width_x, int32_t de
  * @param depth_z Longueur longitudinale de la carte (Axe Z).
  * @param iterations Nombre de passes de lissage (ex: 3).
  */
-void zyn_gen_map_relief_smooth_coastlines(MacroChunk* map, int32_t width_x, int32_t depth_z, int32_t iterations);
+void zyn_gen_map_relief_smooth_coastlines(MacroChunk* map, int32_t width_x, int32_t depth_z, int32_t iterations,ZynTestConfig* test_config);
 
 void zyn_gen_map_relief(MacroChunk* map, int32_t width_x, int32_t depth_z, uint32_t seed, ZynTestConfig* test_config);
+
+void normaliser(float* tableau, float min,float max,size_t total_cases,float vmin,float vmax);
+/**
+ * @brief Génère la carte de hauteur macro-procédurale de Zynthar.
+ * * @param hauteurs_triees   [out] Tableau de destination Row-Major (taille: width_x * depth_z).
+ * @param masque_voronoi    [in]  Masque d'atténuation de l'île (taille: width_x * depth_z).
+ * @param width_x           Largeur de la grille (ex: 2000).
+ * @param depth_z           Profondeur de la grille (ex: 1000).
+ * @param seed              Graine déterministe globale pour les offsets du monde.
+ * @param out_relief_min    [out] Pointeur vers la hauteur minimale consolidée.
+ * @param out_relief_max    [out] Pointeur vers la hauteur maximale consolidée.
+ */
+void zyn_map_relief_perlin(float * __restrict hauteurs_triees,
+    const float * __restrict masque_voronoi,
+    int32_t width_x,
+    int32_t depth_z,
+    uint32_t seed,
+    float *out_relief_min,
+    float *out_relief_max
+);
+float zyn_niv_mer_corrige(float* hauteurs_triees, size_t total_cases, double max_sea_percentage) ;
+
+void zyn_map_correction_niv_mer(float* hauteurs_triees, size_t total_cases, float niveau_mer_calcule);
 
 #endif /* ZYN_GEN_MAP_RELIEF_H */

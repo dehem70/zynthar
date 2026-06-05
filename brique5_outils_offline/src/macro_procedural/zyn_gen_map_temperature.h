@@ -5,6 +5,7 @@
 
 // Inclusion globale gérée par CMake
 #include <zynthar.h>
+#include "zyn_test_framework.h"
 
 /**
  * @brief Génère la carte de température macro en appliquant un gradient planétaire
@@ -19,6 +20,6 @@
  * @param width_x Largeur transversale de la carte (Axe X).
  * @param depth_z Longueur longitudinale de la carte (Axe Z).
  */
-void zyn_gen_map_temperature(MacroChunk* map, int32_t width_x, int32_t depth_z);
+void zyn_gen_map_temperature(MacroChunk* map, int32_t width_x, int32_t depth_z, ZynTestConfig* test_config);
 
 #endif /* ZYN_GEN_MAP_TEMPERATURE_H */

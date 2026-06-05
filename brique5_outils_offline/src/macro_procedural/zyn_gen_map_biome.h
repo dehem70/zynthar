@@ -10,6 +10,8 @@
 
 #include <stdint.h>
 #include <zynthar.h>
+#include "zyn_test_framework.h"
+
 
 /**
  * @brief Calcule et attribue le biome final de chaque MacroChunk.
@@ -21,6 +23,6 @@
  * @param width_x Largeur de la carte.
  * @param depth_z Longueur de la carte.
  */
-void zyn_gen_map_biome(MacroChunk* map, int32_t width_x, int32_t depth_z);
+void zyn_gen_map_biome(MacroChunk* map, int32_t width_x, int32_t depth_z,ZynTestConfig* test_config);
 
 #endif // ZYN_GEN_MAP_BIOME_H

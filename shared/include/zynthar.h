@@ -36,6 +36,9 @@ int stbi_write_png(char const *filename, int w, int h, int comp, void const *dat
 #define ZYN_WORLD_X_MAX         (ZYN_WORLD_MACRO_WIDTH_X * ZYN_MACRO_CHUNK_DIM_M)
 #define ZYN_WORLD_Z_MAX         (ZYN_WORLD_MACRO_DEPTH_Z * ZYN_MACRO_CHUNK_DIM_M)
 
+#define ZYN_BAND_SIZE 50
+
+
 // --- Seuils Physiques de Déplacement (Exprimés en nombre de voxels de 10cm) ---
 #define ZYN_SEUIL_MARCHE_AUTO   4        // <= 40 cm (1 à 4 blocs)
 #define ZYN_SEUIL_SAUT          10       // 40 cm à 1 m (5 à 10 blocs)

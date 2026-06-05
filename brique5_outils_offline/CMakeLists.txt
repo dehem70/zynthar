@@ -19,6 +19,12 @@ add_library(zyn_procedural_offline STATIC
     src/macro_procedural/zyn_gen_map_humidity.h
     src/macro_procedural/zyn_gen_map_river.c
     src/macro_procedural/zyn_gen_map_river.h
+    src/macro_procedural/zyn_river_agent.c
+    src/macro_procedural/zyn_river_agent.h
+    src/macro_procedural/zyn_river_stepper.c
+    src/macro_procedural/zyn_river_stepper.h
+    src/macro_procedural/zyn_river_system_pipeline.c
+    src/macro_procedural/zyn_river_system_pipeline.h
     src/macro_procedural/zyn_gen_map_biome.c
     src/macro_procedural/zyn_gen_map_biome.h
     src/macro_procedural/zyn_gen_map_macro.c
@@ -27,6 +33,8 @@ add_library(zyn_procedural_offline STATIC
     src/macro_procedural/zyn_gen_png.h
     src/macro_procedural/zyn_test_framework.c
     src/macro_procedural/zyn_test_framework.h
+    src/macro_procedural/zyn_utils.c
+    src/macro_procedural/zyn_utils.h
 )
 find_package(OpenMP REQUIRED)
 if(OpenMP_FOUND)

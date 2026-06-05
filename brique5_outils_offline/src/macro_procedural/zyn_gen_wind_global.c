@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#define _GNU_SOURCE
 #include <math.h>
 
 #include <zynthar.h>
@@ -20,62 +21,51 @@
 #include "zyn_noise.h"
 
 WindVector get_global_wind(int32_t chunk_x, int32_t chunk_y) {
-    /* Échelle à très basse fréquence pour simuler les grands courants */
     const float scale = 0.015f; 
-    float fx = (float)chunk_x * scale;
-    float fz = (float)chunk_y * scale;
+    const float fx = (float)chunk_x * scale;
+    const float fz = (float)chunk_y * scale;
 
-    /* Configuration des caractéristiques fractales pour un rendu fluide */
     const int32_t octaves = 4;
     const float persistence = 0.55f;
     const float lacunarity = 2.15f;
-
-    /* Constante d'amplification pour compenser l'atténuation native des FBM */
     const float fbm_booster = 2.5f;
 
     /* =========================================================================
-     * OCTAVE 1 : DIRECTION DU VENT (FBM Fractale)
+     * OCTAVE 1 : DIRECTION DU VENT
      * ========================================================================= */
-    float nx_angle = fx + 17.319f;
-    float nz_angle = fz + 59.713f;
+    const float noise_angle_raw = zyn_fractal_noise2d(fx + 17.319f, fz + 59.713f, octaves, persistence, lacunarity);
     
-    float noise_angle = zyn_fractal_noise2d(nx_angle, nz_angle, octaves, persistence, lacunarity);
+    // Simplification algébrique : (clamp(noise * 2.5) + 1.0) * 0.5 * 2 * PI  =>  (clamp(noise * 2.5) + 1.0) * PI
+    float noise_angle = noise_angle_raw * fbm_booster;
+    noise_angle = __builtin_fmaxf(-1.0f, __builtin_fminf(noise_angle, 1.0f));
     
-    /* Amplification et clamping strict dans [-1.0f, 1.0f] */
-    noise_angle *= fbm_booster;
-    noise_angle = fmaxf(-1.0f, fminf(noise_angle, 1.0f));
-    
-    /* Normalisation finale dans [0.0f, 1.0f] pour calculer l'angle en radians */
-    float angle_normalise = (noise_angle + 1.0f) * 0.5f;
-    float angle = angle_normalise * 2.0f * (float)M_PI;
+    const float angle = (noise_angle + 1.0f) * (float)M_PI;
 
     /* =========================================================================
-     * OCTAVE 2 : VITESSE DU VENT (FBM Fractale)
+     * OCTAVE 2 : VITESSE DU VENT
      * ========================================================================= */
-    /* Rotation asymétrique de ~30 degrés pour empêcher le parallélisme visuel 
-     * CORRECTION : Remplacement du 'rz' erroné par 'fz' à droite du signe égal */
-    float rx = (fx * 0.866025f) - (fz * 0.500000f);
-    float rz = (fx * 0.500000f) + (fz * 0.866025f);
+    // Constantes de rotation asymétrique pré-calculées
+    const float rx = (fx * 0.8660254f) - (fz * 0.5f);
+    const float rz = (fx * 0.5f) + (fz * 0.8660254f);
 
-    float nx_speed = rx - 143.619f;
-    float nz_speed = rz + 87.111f;
+    const float noise_speed_raw = zyn_fractal_noise2d(rx - 143.619f, rz + 87.111f, octaves, persistence, lacunarity);
+    
+    float noise_speed = noise_speed_raw * fbm_booster;
+    noise_speed = __builtin_fmaxf(-1.0f, __builtin_fminf(noise_speed, 1.0f));
+    
+    // Simplification : (noise_speed + 1.0) * 0.5 * 90.0  =>  (noise_speed + 1.0) * 45.0
+    const float speed = (noise_speed + 1.0f) * 45.0f; 
 
-    float noise_speed = zyn_fractal_noise2d(nx_speed, nz_speed, octaves, persistence, lacunarity);
-    
-    /* Amplification et clamping strict de la vitesse brute dans [-1.0f, 1.0f] */
-    noise_speed *= fbm_booster;
-    noise_speed = fmaxf(-1.0f, fminf(noise_speed, 1.0f));
-    
-    /* Normalisation linéaire finale [0.0f, 1.0f] */
-    float speed_normalisee = (noise_speed + 1.0f) * 0.5f;
-    
-    /* Vitesse maximale fixée à 90 km/h pour l'échelle macro */
-    float speed = speed_normalisee * 90.0f; 
+    /* =========================================================================
+     * TRANSFORMATION ET SORTIE (FSINCOS COUPLÉ)
+     * ========================================================================= */
+    float sin_a, cos_a;
+    // Appel de l'intrinsèque GCC qui calcule SIN et COS en un seul cycle d'horloge CPU
+    __builtin_sincosf(angle, &sin_a, &cos_a);
 
-    /* Conversion Polaire -> Cartésienne */
     WindVector global_wind;
-    global_wind.dx = speed * cosf(angle);
-    global_wind.dy = speed * sinf(angle);
+    global_wind.dx = speed * cos_a;
+    global_wind.dy = speed * sin_a;
 
     return global_wind;
 }

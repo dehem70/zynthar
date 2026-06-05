@@ -46,12 +46,19 @@ int main(int argc, char** argv) {
     /* 2. CONFIGURATION DU DRAPEAU DE TEST POUR LE PAS 1 */
     ZynTestConfig config;
     config.active_test = 1;   
-    config.target_step = 2;
+    config.target_step = 8;
     config.stress_runs = 20;  
     config.early_exit = 0;
+    config.with_rivers=1;
     /* Documentation des target_step
-        1 : Génération carte avec voronoi
-        2 : injection bruit fractal
+        1 : carte relief - Génération carte avec voronoi
+        2 : carte relief - injection bruit fractal
+        3 : carte relief - reglage niveau mer
+        4 : carte relief - automate celullaire
+        5 : carte température
+        6 : carte humidité
+        7 : carte riviere
+        8 : carte biome
         
     */    
     uint32_t base_seeds[20] = {

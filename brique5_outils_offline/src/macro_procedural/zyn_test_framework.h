@@ -17,6 +17,7 @@ typedef struct {
     int32_t target_step;  /* 1 = Voronoi, 2 = Perlin, 3 = Fusion, 4 = Centiles */
     int32_t stress_runs;  /* Nombre de cartes/seeds à stress-tester (ex: 20) */
     int32_t early_exit;   /* 1 = S'arrêter immédiatement après le pas cible */
+    int32_t with_rivers;
 } ZynTestConfig;
 
 /**

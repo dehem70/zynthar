@@ -26,7 +26,7 @@
 #include "zyn_gen_map_river.h"
 #include "zyn_noise.h"
 /* Capacité maximale de la file statique d'inondation pour éviter tout malloc */
-#define MAX_LAKE_QUEUE 2048
+#define MAX_LAKE_QUEUE 4096
 
 static bool zyn_river_flood_sink(MacroChunk* map, int32_t width_x, int32_t depth_z, 
                                  int32_t start_cx, int32_t start_cz, 
@@ -142,7 +142,7 @@ static bool zyn_river_flood_sink(MacroChunk* map, int32_t width_x, int32_t depth
     return false;
 }
 
-void zyn_gen_map_river(MacroChunk* map, int32_t width_x, int32_t depth_z, uint32_t* out_macro_flux_grid) {
+void zyn_gen_map_river(MacroChunk* map, int32_t width_x, int32_t depth_z, uint32_t* out_macro_flux_grid,ZynTestConfig* test_config) {
     if (map == NULL || width_x <= 0 || depth_z <= 0 || out_macro_flux_grid == NULL) return;
 
     size_t total_macro = (size_t)width_x * (size_t)depth_z;
@@ -150,11 +150,11 @@ void zyn_gen_map_river(MacroChunk* map, int32_t width_x, int32_t depth_z, uint32
 
     const int32_t dx8[] = { 0, 1, 1, 1, 0, -1, -1, -1 };
     const int32_t dz8[] = { -1, -1, 0, 1, 1, 1, 0, -1 };
-    const int32_t rayon_exclusion = 4;
+    const int32_t rayon_exclusion = 32;
 
     /* PASSE 1 : Tracé classique des rivières et Sink Filling local */
-    for (int32_t mz = rayon_exclusion; mz < depth_z - rayon_exclusion; mz++) {
-        for (int32_t mx = rayon_exclusion; mx < width_x - rayon_exclusion; mx++) {
+    for (int32_t mz = 0; mz < depth_z; mz++) {
+        for (int32_t mx = 0; mx < width_x; mx++) {
             size_t m_idx = (size_t)mz * width_x + mx;
             MacroChunk* chunk = &map[m_idx];
 
@@ -201,7 +201,7 @@ void zyn_gen_map_river(MacroChunk* map, int32_t width_x, int32_t depth_z, uint32
                 int32_t last_dir_z = 0;
                 int32_t pas = 0;
 
-                while (pas < 1000) {
+                while (pas < 10000) {
                     if (cx <= 0 || cx >= width_x - 1 || cz <= 0 || cz >= depth_z - 1) break;
 
                     size_t curr_idx = (size_t)cz * width_x + cx;
@@ -310,5 +310,8 @@ void zyn_gen_map_river(MacroChunk* map, int32_t width_x, int32_t depth_z, uint32
                 }
             }
         }
+    }
+     if (test_config != NULL && test_config->active_test == 1 && test_config->target_step == 7) {
+        test_config->early_exit=1;
     }
 }

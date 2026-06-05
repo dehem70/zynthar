@@ -23,7 +23,7 @@
 #include <zynthar.h>
 #include "zyn_gen_map_biome.h"
 
-void zyn_gen_map_biome(MacroChunk* map, int32_t width_x, int32_t depth_z) {
+void zyn_gen_map_biome(MacroChunk* map, int32_t width_x, int32_t depth_z,ZynTestConfig* test_config) {
     if (map == NULL || width_x <= 0 || depth_z <= 0) return;
 
     /*--------------------------------------------------------------------------
@@ -47,11 +47,11 @@ void zyn_gen_map_biome(MacroChunk* map, int32_t width_x, int32_t depth_z) {
     MacroChunk* chunk = map;
 
     /* Seuils d'altitudes convertis en décimètres pour les calculs d'étagement */
-    const int16_t alt_abysse_dm  = M_TO_DM(-500.0f);
-    const int16_t alt_profond_dm = M_TO_DM(-50.0f);
+    const int16_t alt_abysse_dm  = M_TO_DM(0.8f*ZYN_WORLD_Y_MIN);
+    const int16_t alt_profond_dm = M_TO_DM(0.2f*ZYN_WORLD_Y_MIN);
     const int16_t alt_plage_dm   = M_TO_DM(10.0f);
-    const int16_t alt_alpin_dm   = M_TO_DM(1200.0f);
-    const int16_t alt_glacier_dm = M_TO_DM(1600.0f);
+    const int16_t alt_alpin_dm   = M_TO_DM(0.65f*ZYN_WORLD_Y_MAX);
+    const int16_t alt_glacier_dm = M_TO_DM(0.8f*ZYN_WORLD_Y_MAX);
 
     for (size_t i = 0; i < total_chunks; i++) {
         int16_t alt_dm = chunk->elevation_max_dm;
@@ -61,9 +61,9 @@ void zyn_gen_map_biome(MacroChunk* map, int32_t width_x, int32_t depth_z) {
          * REGLE 1 : LE DOMAINE MARITIME BATHYMÉTRIQUE
          *----------------------------------------------------------------------*/
         if (alt_dm <= ZYN_SEA_LEVEL) {
-            if (alt_dm < alt_abysse_dm) {
+            if (alt_dm <= alt_abysse_dm) {
                 chunk->biome = ZYN_BIOME_ABYSSE;
-            } else if (alt_dm < alt_profond_dm) {
+            } else if (alt_dm <= alt_profond_dm) {
                 chunk->biome = ZYN_BIOME_EAU_PROFONDE;
             } else {
                 chunk->biome = ZYN_BIOME_EAU_COTIERE;
@@ -126,5 +126,8 @@ void zyn_gen_map_biome(MacroChunk* map, int32_t width_x, int32_t depth_z) {
 
         chunk->biome = TABLE_WHITTAKER[t_idx][h_idx];
         chunk++;
+    }
+    if (test_config != NULL && test_config->active_test == 1 && test_config->target_step == 8) {
+        test_config->early_exit=1;
     }
 }

@@ -5,6 +5,7 @@
 
 // Inclusion globale gérée par CMake
 #include <zynthar.h>
+#include "zyn_river_agent.h"
 
 /**
  * @brief Exporte la carte d'élévation macro en une image PNG en niveaux de gris et son masque binaire.
@@ -30,7 +31,19 @@ int zyn_gen_png_elevation(const MacroChunk* map, int32_t width_x, int32_t depth_
  * @param filename Chemin du fichier PNG à générer (ex: "carte_temperature.png").
  * @return int 1 si le fichier a été écrit avec succès, 0 en cas d'échec.
  */
-int zyn_gen_png_temperature(const MacroChunk* map, int32_t width_x, int32_t depth_z, const char* filename);  
+int zyn_gen_png_temperature(const MacroChunk* map, int32_t width_x, int32_t depth_z, const char* filename); 
+
+/**
+ * @brief Exporte la carte de l'humidite macro en une image PNG en niveaux de gris.
+ * Le froid polaire (0) sera noir (0), la chaleur équatoriale (255) sera blanche (255).
+ *
+ * @param map Pointeur constant vers la grille de MacroChunks.
+ * @param width_x Largeur transversale de la carte (Axe X).
+ * @param depth_z Longueur longitudinale de la carte (Axe Z).
+ * @param filename Chemin du fichier PNG à générer (ex: "carte_temperature.png").
+ * @return int 1 si le fichier a été écrit avec succès, 0 en cas d'échec.
+ */
+int zyn_gen_png_humidite(const MacroChunk* map, int32_t width_x, int32_t depth_z, const char* filename); 
 
 /**
  * @brief Exporte la carte des vecteurs de vent sous forme de grille de flèches (Quiver Plot).
@@ -79,8 +92,8 @@ int zyn_gen_png_humidity(const MacroChunk* map, int32_t width_x, int32_t depth_z
  * @param filename Chemin du fichier PNG hydrographique à générer.
  * @return int 1 si le fichier a été écrit avec succès, 0 en cas d'échec.
  */
-int zyn_gen_png_rivers(const MacroChunk* map, int32_t width_x, int32_t depth_z, const uint32_t* flux_grid, const char* filename);
-
+//int zyn_gen_png_rivers(const MacroChunk* map, int32_t width_x, int32_t depth_z, const uint32_t* flux_grid, const char* filename);
+int zyn_gen_png_rivers(const MacroChunk* map, int32_t width_x, int32_t depth_z,const ZynRiverNode* river_nodes, int32_t nodes_count,const char* filename); 
 /**
  * @brief Exporte la carte des biomes.
  *

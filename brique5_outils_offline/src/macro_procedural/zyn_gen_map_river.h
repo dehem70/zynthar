@@ -9,6 +9,7 @@
  * ============================================================================= */
 #include <stdint.h>
 #include <zynthar.h>
+#include "zyn_test_framework.h"
 
 /*
  * @brief Structure représentant un nœud ou segment de rivière calculé à l'échelle Macro.
@@ -17,8 +18,6 @@
 typedef struct {
     int32_t macro_x;       /* Coordonnée macro X */
     int32_t macro_z;       /* Coordonnée macro Z (Axe longitudinal) */
-    uint8_t entry_micro_x; /* Point d'ancrage d'entrée local Micro X (0 à 19) */
-    uint8_t entry_micro_z; /* Point d'ancrage d'entrée local Micro Z (0 à 19) */
     uint8_t direction;     /* Direction d'écoulement vers le voisin macro (1 à 8) */
     uint32_t flow_volume;  /* Débit ou volume accumulé */
 } ZynRiverNode;
@@ -32,7 +31,7 @@ typedef struct {
  * @param out_macro_flux_grid Tableau de uint32_t de taille (width_x * depth_z) alloué
  * par l'appelant pour stocker le flux accumulé macro.
  */
-void zyn_gen_map_river(MacroChunk* map, int32_t width_x, int32_t depth_z, uint32_t* out_macro_flux_grid);
+void zyn_gen_map_river(MacroChunk* map, int32_t width_x, int32_t depth_z, uint32_t* out_macro_flux_grid,ZynTestConfig* test_config);
 
 /**
  * @brief Inonde une cuvette macro à partir d'un point de blocage.

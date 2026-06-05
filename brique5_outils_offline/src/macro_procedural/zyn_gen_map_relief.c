@@ -21,10 +21,13 @@
 #include "zyn_noise.h"
 #include "zyn_gen_map_relief.h"
 #include "zyn_test_framework.h"
+#include "zyn_utils.h"
 
 typedef struct {
     float x;
     float z;
+    float hauteur_max;    // Facteur d'altitude max associé à cette cellule (Idée 1 : 0.5 à 1.0)
+    uint32_t id;
 } IslandSeed;
 
 MacroChunk* zyn_gen_map_relief_alloc(int32_t width_x, int32_t depth_z) {
@@ -55,6 +58,7 @@ float* zyn_gen_map_relief_voronoi(int32_t width_x, int32_t depth_z, int32_t num_
     /* Positionnement déterministe des germes */
     uint32_t lcg_state = seed; 
     for (int32_t i = 0; i < num_islands; i++) {
+        seeds[i].id=i;
         lcg_state = lcg_state * 1103515245 + 12345;
         float rand_x = (float)lcg_state / 4294967295.0f;
         seeds[i].x = rand_x * (float)width_x;
@@ -62,6 +66,14 @@ float* zyn_gen_map_relief_voronoi(int32_t width_x, int32_t depth_z, int32_t num_
         lcg_state = lcg_state * 1103515245 + 12345;
         float rand_z = (float)lcg_state / 4294967295.0f;
         seeds[i].z = rand_z * (float)depth_z;
+        uint32_t hash = seeds[i].id ^ seed;
+        hash = (hash ^ 61) ^ (hash >> 16);
+        hash = hash + (hash << 3);
+        hash = hash ^ (hash >> 4);
+        hash = hash * 0x27d4eb2d;
+        hash = hash ^ (hash >> 15);
+        float random_0_1 = (float)(hash & 0xFFFFFF) / 16777215.0f;
+        seeds[i].hauteur_max = 0.25f + (0.75f * random_0_1);
     }
 
     const float EPSILON_STABILITE = 0.123456f;
@@ -87,6 +99,7 @@ float* zyn_gen_map_relief_voronoi(int32_t width_x, int32_t depth_z, int32_t num_
             float fz_deforme = fz + v_warp_z;
 
             float min_dist_hybride_carre = 99999999.0f;
+            int32_t seed_proche=0;
 
             for (int32_t i = 0; i < num_islands; i++) {
                 float dx = fabsf(seeds[i].x - fx_deforme);
@@ -97,10 +110,11 @@ float* zyn_gen_map_relief_voronoi(int32_t width_x, int32_t depth_z, int32_t num_
                 float dist_manhattan_carre = dist_manhattan * dist_manhattan;
 
                 /* Mix structurel */
-                float dist_mixte_carre = (dist_euclidienne_carre * 0.75f) + (dist_manhattan_carre * 0.25f);
+                float dist_mixte_carre = (dist_euclidienne_carre * 0.75f) + (dist_manhattan_carre * 0.25f)*seeds[i].hauteur_max;
 
                 if (dist_mixte_carre < min_dist_hybride_carre) {
                     min_dist_hybride_carre = dist_mixte_carre;
+                    seed_proche=i;
                 }
             }
 
@@ -150,6 +164,212 @@ static int comparer_floats(const void* a, const void* b) {
     return 0;
 }
 
+
+// --- Pseudo-Bruit de Perlin 2D ultra-léger pour le déterminisme ---
+// Note : En production, on utilisera notre implémentation de la Tâche 2.3
+static float hash2d(int x, int y) {
+    int h = x * 374761393 + y * 668265263;
+    h = (h ^ (h >> 13)) * 1274126177;
+    return (float)(h & 0x7FFFFFFF) / 2147483647.0f;
+}
+
+static float bruit_gradient_2d(float x, float y) {
+    int ix = (int)floorf(x);
+    int iy = (int)floorf(y);
+    float fx = x - (float)ix;
+    float fy = y - (float)iy;
+
+    // Interpolation cubique (Smoothstep local)
+    float ux = fx * fx * (3.0f - 2.0f * fx);
+    float uy = fy * fy * (3.0f - 2.0f * fy);
+
+    float a = hash2d(ix, iy);
+    float b = hash2d(ix + 1, iy);
+    float c = hash2d(ix, iy + 1);
+    float d = hash2d(ix + 1, iy + 1);
+
+    return a * (1.0f - ux) * (1.0f - uy) +
+           b * ux * (1.0f - uy) +
+           c * (1.0f - ux) * uy +
+           d * ux * uy;
+}
+
+// --- Fonction Smootherstep de Ken Perlin ---
+static float smootherstep(float edge0, float edge1, float x) {
+    // Clamping de la valeur entre 0 et 1
+    float t = (x - edge0) / (edge1 - edge0);
+    if (t < 0.0f) t = 0.0f;
+    if (t > 1.0f) t = 0.0f; // Si t > 1, on est hors zone (bord absolu)
+    if (x >= edge1) return 1.0f;
+    
+    // Formule : 6t^5 - 15t^4 + 10t^3
+    return t * t * t * (t * (t * 6.0f - 15.0f) + 10.0f);
+}
+
+// --- LA FONCTION DEMANDÉE ---
+float calculer_masque_bordure_organique(float x, float y) {
+    // 1. Sécurité : Clamping strict aux limites du monde
+    if (x <= 0.0f || x >= ZYN_WORLD_MACRO_WIDTH_X  || y <= 0.0f || y >= ZYN_WORLD_MACRO_DEPTH_Z) {
+        return 0.0f; 
+    }
+
+    // 2. Injection de distorsion (Domain Warping) pour casser la ligne droite
+    // On utilise une basse fréquence (ex: division par 15000 mètres)
+    float distorsion_x = bruit_gradient_2d(x / 30.0f, y / 30.0f) * 4.0f;
+    float distorsion_y = bruit_gradient_2d(y / 30.0f, x / 30.0f) * 4.0f;
+
+    float x_deforme = x + distorsion_x;
+    float y_deforme = y + distorsion_y;
+
+    // 3. Calcul de la distance la plus courte par rapport aux 4 bords du monde
+    float dist_gauche = x_deforme;
+    float dist_droite = ZYN_WORLD_MACRO_WIDTH_X  - x_deforme;
+    float dist_bas    = y_deforme;
+    float dist_haut   = ZYN_WORLD_MACRO_DEPTH_Z - y_deforme;
+
+    // Trouver le minimum des 4 distances
+    float dist_min = dist_gauche;
+    if (dist_droite < dist_min) dist_min = dist_droite;
+    if (dist_bas < dist_min)    dist_min = dist_bas;
+    if (dist_haut < dist_min)   dist_min = dist_haut;
+
+    // 4. Application du filtre de transition non linéaire
+    // De 0m (bord) à TRANSITION_ZONE_M (plein continent), on applique le smootherstep
+    float coefficient_masque = smootherstep(0.0f, ZYN_BAND_SIZE, dist_min);
+
+    return coefficient_masque;
+}
+
+void zyn_map_relief_perlin(float * __restrict hauteurs_triees,const float * __restrict masque_voronoi,int32_t width_x,int32_t depth_z,uint32_t seed,float *out_relief_min,float *out_relief_max) {
+// Configuration fixe de la génération de Zynthar
+    const int32_t octaves = 5;
+    const float persistence = 0.54f;
+    const float lacunarity = 2.1f;
+    const float base_scale = 0.006f;
+    
+    // Calcul déterministe des offsets via la seed globale (Brique 5.2)
+    const float offset_x = 1250.5f + (float)(seed % 7919);
+    const float offset_z = -4580.2f - (float)((seed >> 4) % 5417);
+
+    // Registres locaux pour éviter les lectures/écritures répétées dans les pointeurs
+    float relief_min = 0.0f;
+    float relief_max = 0.0f;
+
+    float * __restrict p_hauteurs = hauteurs_triees;
+    const float * __restrict p_masque = masque_voronoi;
+
+    // Boucle externe Z (Row-Major, respect absolu de la localité spatiale L1/L2)
+    for (int32_t z = 0; z < depth_z; z++) {
+        const float z_f = (float)z;
+        
+        // Invariants de boucle pré-calculés pour la ligne courante
+        const float warp_dx_base_z = (z_f - 300.45f) * 0.002f;
+        const float warp_dz_base_z = (z_f + 800.89f) * 0.002f;
+        const float nz = (z_f + offset_z) * base_scale;
+
+        const size_t row_index = (size_t)z * (size_t)width_x;
+
+        #pragma GCC ivdep
+        for (int32_t x = 0; x < width_x; x++) {
+            const size_t index = row_index + x; 
+            const float x_f = (float)x;
+            float B_mask = calculer_masque_bordure_organique(x, z);
+            
+            // 1. Domain Warping stabilisé
+            const float warp_dx = zyn_noise2d((x_f + 500.23f) * 0.002f, warp_dx_base_z) * 90.0f;
+            const float warp_dz = zyn_noise2d((x_f - 200.67f) * 0.002f, warp_dz_base_z) * 90.0f;
+
+            const float nx = (x_f + warp_dx + offset_x) * base_scale;
+            const float final_nz = nz + (warp_dz * base_scale); 
+        
+            // 2. Échantillonnage du bruit fractal
+            const float bruit_global = zyn_fractal_noise2d(nx, final_nz, octaves, persistence, lacunarity);
+
+            // 3. Application de l'équation morphologique globale
+            const float v_mask = p_masque[index];
+            const float zone_oceanique = 1.0f - v_mask;
+            float signal_falaise = bruit_global; 
+
+            // Étape A : On amplifie le contraste du bruit à un certain niveau pour créer des ruptures
+            if (signal_falaise > 0.2f && signal_falaise < 0.5f) {
+                // On est dans la zone de falaise potentielle. 
+                // On applique une interpolation cubique (Hermite) pour redresser violemment la pente
+                float t = (signal_falaise - 0.2f) / 0.3f; // Normalisation entre 0 et 1
+                float courbe_accentuee = t * t * (3.0f - 2.0f * t); // Smoothstep
+    
+                // On applique l'étirage vertical (ici bridé à une amplitude maximale équivalente à 200m dans ton échelle)
+                // On réinjecte une micro-perturbation pour que la falaise ne soit pas un mur lisse et rectiligne
+                float perturbation_falaise = warp_dx * 0.05f; 
+                signal_falaise = 0.02f + (courbe_accentuee * 0.05f) + 0.1*perturbation_falaise;
+            }
+            
+            float amplitude_falaise = 0.5f * B_mask;
+            float amplitude_bruit   = 3.5f * B_mask;
+            
+            float relief_terrestre = (amplitude_falaise * signal_falaise) + (bruit_global * amplitude_bruit) + (v_mask * v_mask * 2.5f);
+            
+            float ocean_local = zone_oceanique * zone_oceanique * 0.6f;
+            float abysse_bord = (1.0f - B_mask) * 4.0f;
+            
+            // 5. Équation finale équilibrée
+            float relief_brut = relief_terrestre - ocean_local - abysse_bord;
+            
+          //  const float relief_brut = 0.5f*signal_falaise+(bruit_global * 3.5f) + (v_mask * v_mask* 2.5f) - (zone_oceanique * zone_oceanique * 0.6f);
+
+            // 4. Accumulation native min/max (Branchless)
+            relief_min = __builtin_fminf(relief_brut, relief_min);
+            relief_max = __builtin_fmaxf(relief_brut, relief_max);
+        
+            p_hauteurs[index] = relief_brut;
+        }
+    }
+
+    // Exportation finale des extrema vers les pointeurs appelants
+    *out_relief_min = relief_min;
+    *out_relief_max = relief_max;
+}
+
+float zyn_niv_mer_corrige(float* hauteurs_triees, size_t total_cases, double max_sea_percentage) {
+    if (hauteurs_triees == NULL || total_cases == 0) {
+        return 0.0f;
+    }
+
+    float* copie_pour_tri = (float*)malloc(total_cases * sizeof(float));
+    if (copie_pour_tri == NULL) { 
+        return 0.0f; 
+    }
+    
+    memcpy(copie_pour_tri, hauteurs_triees, total_cases * sizeof(float));
+    qsort(copie_pour_tri, total_cases, sizeof(float), comparer_floats);
+
+    size_t index_mer = (size_t)((double)total_cases * max_sea_percentage);
+    index_mer = __builtin_fminf(index_mer, total_cases-1);
+    
+    float niveau_mer_calcule = copie_pour_tri[index_mer];
+    free(copie_pour_tri);
+
+    return niveau_mer_calcule;
+}
+
+void zyn_map_correction_niv_mer(float* __restrict hauteurs_triees, size_t total_cases, float niveau_mer_calcule){
+
+    float max_brut_terre = 0.0001f; 
+    float min_brut_mer   = -0.0001f;
+
+    #pragma GCC ivdep
+    for (size_t i = 0; i < total_cases; i++) {
+        const float alt_relative = hauteurs_triees[i] - niveau_mer_calcule;
+        
+        // Stockage direct du résultat de la soustraction (fusion de la boucle 2)
+        hauteurs_triees[i] = alt_relative;
+
+         max_brut_terre = __builtin_fmaxf(max_brut_terre, alt_relative);
+        min_brut_mer   = __builtin_fminf(min_brut_mer, alt_relative);
+    }
+    
+    normaliser(hauteurs_triees, min_brut_mer, max_brut_terre, total_cases, -1.0f, 1.0f);
+}
+    
 /* =============================================================================
  * FUSION DU RELIEF ET SCULPTURE DES CONTINENTS
  * ============================================================================= */
@@ -178,61 +398,14 @@ void zyn_gen_map_relief_archipelago(MacroChunk* map, int32_t width_x, int32_t de
     size_t total_cases = (size_t)width_x * (size_t)depth_z;
     float* hauteurs_triees = (float*)malloc(total_cases * sizeof(float));
     if (hauteurs_triees == NULL) { free(masque_voronoi); return; }
-
-    int32_t octaves = 5;
-    float persistence = 0.54f;
-    float lacunarity = 2.1f;
-    float base_scale = 0.006f;
-    
-    float offset_x = 1250.5f + (float)(seed % 7919);
-    float offset_z = -4580.2f - (float)((seed >> 4) % 5417);
     float relief_min=0.0f;
     float relief_max=0.0f;
+    
+    zyn_map_relief_perlin(hauteurs_triees,masque_voronoi,width_x,depth_z,seed,&relief_min,&relief_max);
 
-    for (int32_t z = 0; z < depth_z; z++) {
-        for (int32_t x = 0; x < width_x; x++) {
-            size_t index = ZYN_INDEX(x, z, width_x);
-            
-            /* Calcul du Domain Warping stabilisé */
-            float warp_dx = zyn_noise2d((x + 500.23f) * 0.002f, (z - 300.45f) * 0.002f) * 90.0f;
-            float warp_dz = zyn_noise2d((x - 200.67f) * 0.002f, (z + 800.89f) * 0.002f) * 90.0f;
-
-            float nx = (x + warp_dx + offset_x) * base_scale;
-            float nz = (z + warp_dz + offset_z) * base_scale;
-            
-            float bruit_global = zyn_fractal_noise2d(nx, nz, octaves, persistence, lacunarity);
-
-            float v_mask = masque_voronoi[index];       // 1.0 au sommet, 0.0 au large
-            float zone_oceanique = 1.0f - v_mask;       // 0.0 au sommet, 1.0 au large
-
-            /* 1. L'ÉQUATION DU RELIEF TOTAL (TERRE + MER) 
-               Le bruit s'exprime pleinement PARTOUT (coefficient 0.6f). 
-               - Au centre de l'île (v_mask=1.0), l'ascenseur monte (+1.4f). Le relief est haut.
-               - Au large (v_mask=0.0), l'ascenseur descend (-1.3f). Le bruit crée des creux et des bosses sous l'eau.
-            */
-            float relief_brut = (bruit_global * 0.6f) + (v_mask * 1.4f) - (zone_oceanique * 1.3f);
-
-            /* 2. EFFET DES BORDURES DE CARTE (OPTIONNEL)
-               Si tu veux que l'océan devienne de plus en plus profond (fosses) à mesure qu'on s'éloigne 
-               des îles, on peut accentuer la descente au grand large tout en gardant 100% du relief du bruit.
-            */
-            relief_brut -= (zone_oceanique * zone_oceanique * 0.4f);
-            if(relief_brut<relief_min) relief_min=relief_brut;
-            if(relief_brut>relief_max) relief_max=relief_brut;
-            hauteurs_triees[index] = relief_brut;
-            
-        }
-    }
     free(masque_voronoi);
 
-
-    for (int32_t p=0;p<total_cases;p++) {
-        if (hauteurs_triees[p]<=0) {
-            hauteurs_triees[p] *= -1/relief_min;
-        } else {
-            hauteurs_triees[p] *= 1/relief_max;
-        }
-    }
+    normaliser(hauteurs_triees, relief_min,relief_max,total_cases,-1.0f,1.0f);
     
     /* -------------------------------------------------------------------------
        INTERCEPTION ET COPIE DANS MAP SI ARRET PAS 2 DEMANDÉ
@@ -256,58 +429,33 @@ void zyn_gen_map_relief_archipelago(MacroChunk* map, int32_t width_x, int32_t de
         return; 
     }
 
-    /* Code de tri classique remis au propre */
-    float* copie_pour_tri = (float*)malloc(total_cases * sizeof(float));
-    if (copie_pour_tri == NULL) { free(hauteurs_triees); return; }
-    memcpy(copie_pour_tri, hauteurs_triees, total_cases * sizeof(float));
-    qsort(copie_pour_tri, total_cases, sizeof(float), comparer_floats);
-
-    size_t index_mer = (size_t)((double)total_cases * (double)max_sea_percentage);
-    if (index_mer >= total_cases) index_mer = total_cases - 1;
-    float niveau_mer_calcule = copie_pour_tri[index_mer];
-    free(copie_pour_tri);
-
-    float max_brut_terre = 0.0001f; 
-    float min_brut_mer   = -0.0001f;
-
-    for (size_t i = 0; i < total_cases; i++) {
-        float alt_relative = hauteurs_triees[i] - niveau_mer_calcule;
-        if (alt_relative > 0.0f && alt_relative > max_brut_terre) max_brut_terre = alt_relative;
-        if (alt_relative < 0.0f && alt_relative < min_brut_mer)   min_brut_mer = alt_relative;
-    }
+    float niveau_mer_calcule = zyn_niv_mer_corrige(hauteurs_triees, total_cases, max_sea_percentage); 
+    zyn_map_correction_niv_mer(hauteurs_triees, total_cases, niveau_mer_calcule);
     
-    float max_monde_config_m  = (float)ZYN_WORLD_Y_MAX;
-    float min_monde_config_m  = (float)ZYN_WORLD_Y_MIN;
-    float coef_positif = max_monde_config_m / max_brut_terre;
-    float coef_negatif = fabsf(min_monde_config_m) / fabsf(min_brut_mer);
+    normaliser(hauteurs_triees, -1.0f,1.0f,total_cases,(float)ZYN_WORLD_Y_MIN,(float)ZYN_WORLD_Y_MAX);
 
     for (int32_t z = 0; z < depth_z; z++) {
         for (int32_t x = 0; x < width_x; x++) {
             size_t index = ZYN_INDEX(x, z, width_x);
-            
-            float alt_relative = hauteurs_triees[index] - niveau_mer_calcule;
-            float alt_finale_m = 0.0f;
 
-            if (alt_relative > 0.0f) {
-                alt_finale_m = (alt_relative * coef_positif);
-            } else {
-                alt_finale_m = -(fabsf(alt_relative) * coef_negatif);
-            }
-
-            float alt_clamped_m = fmaxf(min_monde_config_m, fminf(alt_finale_m, max_monde_config_m));
-
-            map[index].elevation_max_dm = (int16_t)roundf(alt_clamped_m * 10.0f);
+            map[index].elevation_max_dm = (int16_t)roundf(hauteurs_triees[index] * 10.0f);
             map[index].chunk_x = x;
             map[index].chunk_z = z;
         }
     }
 
     free(hauteurs_triees);
+    /* -------------------------------------------------------------------------
+       INTERCEPTION ET COPIE DANS MAP SI ARRET PAS 3 DEMANDÉ
+        ------------------------------------------------------------------------- */
+    if (test_config != NULL && test_config->active_test == 1 && test_config->target_step == 3) {
+        test_config->early_exit=1;
+    }
 }
 /* =============================================================================
  * LISSAGE DES CÔTES PAR AUTOMATE CELLULAIRE ELEVE AU TYPE SIZE_T
  * ============================================================================= */
-void zyn_gen_map_relief_smooth_coastlines(MacroChunk* map, int32_t width_x, int32_t depth_z, int32_t iterations) {
+void zyn_gen_map_relief_smooth_coastlines(MacroChunk* map, int32_t width_x, int32_t depth_z, int32_t iterations,ZynTestConfig* test_config) {
     if (map == NULL || width_x <= 0 || depth_z <= 0 || iterations <= 0) return;
 
     size_t total_cases = (size_t)width_x * (size_t)depth_z;
@@ -330,50 +478,86 @@ void zyn_gen_map_relief_smooth_coastlines(MacroChunk* map, int32_t width_x, int3
     memcpy(nouvelle_grille, grille_binaire, total_cases);
 
     for (int32_t iter = 0; iter < iterations; iter++) {
-        for (int32_t z = 1; z < depth_z - 1; z++) {
-            size_t offset_ligne = (size_t)z * (size_t)width_x;
-            size_t haut = offset_ligne - (size_t)width_x;
-            size_t bas = offset_ligne + (size_t)width_x;
+        
+        #pragma GCC ivdep
+        for (size_t z = 1; z < depth_z - 1; z++) {
+            const size_t offset_ligne = z * width_x;
+            const size_t haut = offset_ligne - width_x;
+            const size_t bas  = offset_ligne + width_x;
 
-            for (int32_t x = 1; x < width_x - 1; x++) {
-                size_t sx = (size_t)x;
-                int32_t voisins_terre = 
-                    grille_binaire[haut + sx - 1] + grille_binaire[haut + sx] + grille_binaire[haut + sx + 1] +
-                    grille_binaire[offset_ligne + sx - 1]                     + grille_binaire[offset_ligne + sx + 1] +
-                    grille_binaire[bas + sx - 1]  + grille_binaire[bas + sx]  + grille_binaire[bas + sx + 1];
+            // Chargement initial des colonnes pour le glissement (Pipeline logiciel manuel pour éliminer les redondances)
+            // Permet d'éviter de relire 3 fois les mêmes cases en mémoire pour les colonnes adjacentes.
+            
+            #pragma GCC vectorize
+            for (size_t x = 1; x < width_x - 1; x++) {
+                // Somme brute des 8 voisins (en uint8_t ou int32_t automatique pour la SIMD)
+                const int32_t voisins_terre = 
+                    grille_binaire[haut + x - 1]         + grille_binaire[haut + x]         + grille_binaire[haut + x + 1] +
+                    grille_binaire[offset_ligne + x - 1]                                    + grille_binaire[offset_ligne + x + 1] +
+                    grille_binaire[bas + x - 1]          + grille_binaire[bas + x]          + grille_binaire[bas + x + 1];
 
-                size_t index_actuel = offset_ligne + sx;
+                const size_t index_actuel = offset_ligne + x;
+                const uint8_t etat_actuel = grille_binaire[index_actuel];
+
+                // Élimination des branches (Branchless logic) :
+                // condition 1 (Meurt d'isolement) : etat_actuel == 1 && voisins_terre < 4   -> devient 0
+                // condition 2 (Naissance)         : etat_actuel == 0 && voisins_terre >= 5  -> devient 1
+                // condition 3 (Survie)            : reste inchangé si voisins_terre == 4
                 
-                if (grille_binaire[index_actuel] == 1 && voisins_terre < 4) {
-                    nouvelle_grille[index_actuel] = 0; 
-                } else if (grille_binaire[index_actuel] == 0 && voisins_terre >= 5) {
-                    nouvelle_grille[index_actuel] = 1; 
-                } else {
-                    nouvelle_grille[index_actuel] = grille_binaire[index_actuel];
-                }
+                // Formule booléenne condensée compilable en instructions "CMOV" ou masques binaires SIMD :
+                const uint8_t garde_terre = (etat_actuel & (voisins_terre >= 4));
+                const uint8_t nait_terre  = (~etat_actuel & (voisins_terre >= 5));
+                
+                nouvelle_grille[index_actuel] = (garde_terre | nait_terre) & 1;
             }
         }
-        memcpy(grille_binaire, nouvelle_grille, total_cases);
+        
+        // Optimisation majeure : On échange les pointeurs au lieu de faire un memcpy coûteux (Double Buffering)
+        uint8_t* temp = grille_binaire;
+        grille_binaire = nouvelle_grille;
+        nouvelle_grille = temp;
     }
 
+    // Si le nombre d'itérations est impair, les dernières données calculées sont dans 'nouvelle_grille'.
+    // On effectue un unique memcpy final uniquement si nécessaire pour synchroniser le buffer d'origine.
+    if (iterations & 1) {
+        uint8_t* temp = grille_binaire;
+        grille_binaire = nouvelle_grille;
+        nouvelle_grille = temp;
+    }
+    #pragma GCC ivdep
     /* 3. Réassignation finale des hauteurs ajustées dans la structure map */
     for (int32_t z = 0; z < depth_z; z++) {
+        #pragma GCC vectorize
         for (int32_t x = 0; x < width_x; x++) {
             size_t idx = ZYN_INDEX(x, z, width_x);
-            int16_t alt_dm = map[idx].elevation_max_dm;
+            const int16_t alt_dm = map[idx].elevation_max_dm;
+            
+            const uint8_t est_terre = grille_binaire[idx]; // 1 si Terre, 0 si Mer
+            
+            
 
-            if (grille_binaire[idx] == 1) {
-                /* Si l'automate dit "Terre" mais que l'altitude était négative, on la redresse légèrement au-dessus de 0 */
-                map[idx].elevation_max_dm = (alt_dm > 0) ? alt_dm : abs(alt_dm) + 1;
-            } else {
-                /* Si l'automate dit "Mer" mais que l'altitude était positive, on la fait couler sous le niveau 0 */
-                map[idx].elevation_max_dm = (alt_dm < 0) ? alt_dm : -abs(alt_dm) - 1;
-            }
+            const int16_t mask = alt_dm >> 15;
+            const int16_t alt_abs = (alt_dm ^ mask) - mask;
+
+            // Calcul des deux trajectoires cibles de manière purement arithmétique
+            const int16_t cible_terre = (alt_dm > 0) ? alt_dm : alt_abs + 1;
+            const int16_t cible_mer   = (alt_dm < 0) ? alt_dm : -alt_abs - 1;
+
+            // Sélection finale "Branchless" (génère une instruction CMOV ou un masquage SIMD)
+            // Si est_terre vaut 1, on prend cible_terre. Si 0, on prend cible_mer.
+            map[idx].elevation_max_dm = est_terre ? cible_terre : cible_mer;
         }
     }
 
     free(grille_binaire);
     free(nouvelle_grille);
+    /* -------------------------------------------------------------------------
+       INTERCEPTION ET COPIE DANS MAP SI ARRET PAS 4 DEMANDÉ
+        ------------------------------------------------------------------------- */
+    if (test_config != NULL && test_config->active_test == 1 && test_config->target_step == 4) {
+        test_config->early_exit=1;
+    }
 }
 
 /* =============================================================================
@@ -384,7 +568,7 @@ void zyn_gen_map_relief(MacroChunk* map, int32_t width_x, int32_t depth_z, uint3
     zyn_noise_init(seed);
     
     double surface = (double)width_x * (double)depth_z;
-    double base_iles = surface / 444444;
+    double base_iles = surface / 222222;
     if (base_iles < 1.0) base_iles = 1.0;
 
     /* 2. EXTRACTION D'UN FLOTTANT DETERMINISTE ENTRE -1.0f ET +1.0f VIA LA SEED */
@@ -409,5 +593,5 @@ void zyn_gen_map_relief(MacroChunk* map, int32_t width_x, int32_t depth_z, uint3
     zyn_gen_map_relief_archipelago(map, width_x, depth_z, num_islands, max_sea_percentage, seed,test_config);
 
     /* Lissage final des traits de côtes */
-    zyn_gen_map_relief_smooth_coastlines(map, width_x, depth_z, 2);
+    zyn_gen_map_relief_smooth_coastlines(map, width_x, depth_z, 2,test_config);
 }
