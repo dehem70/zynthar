@@ -51,7 +51,7 @@ RiverAgent* river_get_agent_by_id(int32_t id) {
     // On parcourt tout le tableau à la recherche de l'ID
     for (int32_t i = 0; i < MAX_AGENTS; i++) {
         // L'agent doit être actif ET posséder le bon identifiant
-        if (pool[i].is_active && pool[i].id == id) {
+        if (pool[i].id == id) {
             return &pool[i]; // On renvoie l'adresse de cet agent
         }
     }
@@ -149,4 +149,27 @@ uint32_t river_grid_get_flow(int32_t x, int32_t z) {
     
     // 3. Renvoi du débit d'eau stocké dans le tableau de flux
     return river_flow_grid[idx];
+}
+
+
+// Compacter les deux valeurs dans un seul uint32_t
+uint32_t pack_river_data(uint32_t volume, uint8_t direction) {
+    // 1. On s'assure que les valeurs ne dépassent pas leurs masques par sécurité
+    uint32_t v_masked = volume & 0x1FFFF;   // Masque 17 bits (131071 max)
+    uint32_t d_masked = direction & 0xF;    // Masque 4 bits (15 max)
+
+    // 2. On décale la direction de 17 bits vers la gauche et on fusionne avec un OR (|)
+    return (d_masked << 17) | v_masked;
+}
+
+// Extraire le volume depuis le uint32_t compacté
+uint32_t unpack_volume(uint32_t packed_data) {
+    // On applique un masque pour ne lire que les 17 premiers bits
+    return packed_data & 0x1FFFF;
+}
+
+// Extraire la direction depuis le uint32_t compacté
+uint8_t unpack_direction(uint32_t packed_data) {
+    // On décale de 17 bits vers la droite, puis on applique le masque de 4 bits
+    return (uint8_t)((packed_data >> 17) & 0xF);
 }

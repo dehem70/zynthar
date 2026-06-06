@@ -184,15 +184,15 @@ int zyn_gen_png_rivers(const MacroChunk* map, int32_t width_x, int32_t depth_z,
 
     // 2. Application des rivières extraites par-dessus
     for (int32_t i = 0; i < nodes_count; i++) {
-        int32_t rx = river_nodes[i].macro_x;
-        int32_t rz = river_nodes[i].macro_z;
+        int32_t rx = river_nodes[i].region_x*256+river_nodes[i].macro_x;
+        int32_t rz = river_nodes[i].region_z*256+river_nodes[i].macro_z;
 
         if (rx < 0 || rx >= width_x || rz < 0 || rz >= depth_z) continue;
 
         // C'est le SEUL endroit du projet où le * 3 est légitime !
         size_t pixel_index = ((size_t)rz * (size_t)width_x + (size_t)rx) * 3;
 
-        uint32_t flux = river_nodes[i].flow_volume;
+        uint32_t flux = unpack_volume(river_nodes[i].data);
         uint32_t intensite_bleu = 160 + (flux / 10); // Ajustement pour éviter l'overflow visuel
         if (intensite_bleu > 255) intensite_bleu = 255;
 

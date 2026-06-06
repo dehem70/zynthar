@@ -100,10 +100,14 @@ ZynRiverNode* zyn_generate_all_rivers(MacroChunk* world_map, uint32_t world_seed
         for (int32_t x = 0; x < ZYN_WORLD_MACRO_WIDTH_X; x++) {
             int32_t river_id = river_grid_get_id(x, z);
             if (river_id != -1) {
-                river_vector[current_node_idx].macro_x = x;
-                river_vector[current_node_idx].macro_z = z;
-                river_vector[current_node_idx].flow_volume = 1000; 
-                river_vector[current_node_idx].direction = 1;      
+                RiverAgent* agent = river_get_agent_by_id(river_id);
+                river_vector[current_node_idx].region_x = (uint8_t)( x/256);
+                river_vector[current_node_idx].region_z = (uint8_t)( z/256);
+                river_vector[current_node_idx].macro_x = (uint8_t)( x%256);
+                river_vector[current_node_idx].macro_z = (uint8_t)( z%256);
+                uint8_t final_dir = (agent != NULL) ? agent->last_dir : 0;
+                
+                river_vector[current_node_idx].data = pack_river_data(river_grid_get_flow(x, z), final_dir);
                 current_node_idx++;
             }
         }

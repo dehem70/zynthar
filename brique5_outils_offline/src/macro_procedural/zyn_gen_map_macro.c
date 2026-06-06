@@ -24,48 +24,47 @@
 #include "zyn_gen_png.h"
 #include "zyn_gen_map_temperature.h"
 #include "zyn_gen_map_humidity.h"
-/*#include "zyn_gen_map_river.h"*/
 #include "zyn_gen_map_biome.h"
 #include "zyn_gen_map_macro.h"
 #include "zyn_test_framework.h"
 #include "zyn_river_system_pipeline.h"
 
-
-#define PRINT_BOTH(fmt, ...) do { printf(fmt, ##__VA_ARGS__); } while(0)
-
-int zyn_gen_map_macro(uint32_t seed, ZynTestConfig* test_config) {
+int zyn_gen_map_macro(MacroChunk* map, uint32_t seed, ZynRiverNode** out_flux_grid, int32_t* out_nodes_count, ZynTestConfig* test_config) {
+    
+    if (map==NULL) return 1;
+    
     clock_t start_global, end_global, start_etape, end_etape;
     start_global = clock();
     
     int32_t width_x = ZYN_WORLD_MACRO_WIDTH_X;
     int32_t depth_z = ZYN_WORLD_MACRO_DEPTH_Z;
-    int32_t width_x_c = ZYN_WORLD_MACRO_WIDTH_X-ZYN_BAND_SIZE*2;
-    int32_t depth_z_c = ZYN_WORLD_MACRO_DEPTH_Z-ZYN_BAND_SIZE*2;
-    size_t total_chunks_c = (size_t)(width_x_c) * (size_t)(depth_z_c);
     size_t total_chunks = (size_t)width_x * (size_t)depth_z;
-    int32_t out_nodes_count;
-    ZynRiverNode*   flux_grid;
+
     PRINT_BOTH("=====================================================================\n");
     PRINT_BOTH("       ZYNTHAR - SQUELETTE PROCÉDURAL MACRO-CONTINENTAL v0.1.0       \n");
     PRINT_BOTH("=====================================================================\n");
     PRINT_BOTH("[CONFIG] Dimensions du Monde : %d x %d Macro-Chunks\n",width_x, depth_z);
     PRINT_BOTH("[CONFIG] Graine du Monde (SEED) : %u\n", seed);
     PRINT_BOTH("=====================================================================\n\n");
-
-
-    MacroChunk* map = (MacroChunk*)calloc(total_chunks , sizeof(MacroChunk));
-    if (map == NULL) {
-        fprintf(stderr, "Erreur fatale : Allocation de la grille Macro échouée.\n");
-        return 1;
+    ZynTestConfig config;
+    if(test_config==NULL) {
+        config.active_test = 0;   
+        config.target_step = 8;
+        config.stress_runs = 20;  
+        config.early_exit = 0;
+        config.with_rivers=1;
+    } else {
+        config=*test_config;
     }
+    
     /* =========================================================================
      * PHASE 1/5 : GÉNÉRATION DU RELIEF CONTINENTAL
      * ========================================================================= */
-    if (test_config != NULL && test_config->early_exit != 1) {
+    if (config.early_exit != 1) {
         PRINT_BOTH("[1/5] Sculpture des continents et archipels (45%% Terres)... ");
         fflush(stdout);
         start_etape = clock();
-        zyn_gen_map_relief(map, width_x, depth_z, seed,test_config);
+        zyn_gen_map_relief(map, width_x, depth_z, seed,&config);
         end_etape = clock();
         PRINT_BOTH("OK (%.4f sec)\n", ((double)(end_etape - start_etape)) / CLOCKS_PER_SEC);
            
@@ -73,11 +72,11 @@ int zyn_gen_map_macro(uint32_t seed, ZynTestConfig* test_config) {
     /* =========================================================================
      * PHASE 2/5 : GÈNERATION DU MODÈLE THERMIQUE GLOBALE
      * ========================================================================= */
-    if (test_config != NULL && test_config->early_exit != 1) {
+    if (config.early_exit != 1) {
         PRINT_BOTH("[2/5] Application du gradient thermique et insolations... ");
         fflush(stdout);
         start_etape = clock();
-        zyn_gen_map_temperature(map, width_x, depth_z, test_config);
+        zyn_gen_map_temperature(map, width_x, depth_z, &config);
         end_etape = clock();
         PRINT_BOTH("OK (%.4f sec)\n", ((double)(end_etape - start_etape)) / CLOCKS_PER_SEC);
            
@@ -85,40 +84,38 @@ int zyn_gen_map_macro(uint32_t seed, ZynTestConfig* test_config) {
     /* =========================================================================
      * PHASE 3/5 : SIMULATION HYDRO-CLIMATIQUE (HUMIDITÉ ET VENTS)
      * ========================================================================= */
-    if (test_config != NULL && test_config->early_exit != 1) {
+    if (config.early_exit != 1) {
         PRINT_BOTH("[3/5] Simulation des vents et humidité orographique... ");
         fflush(stdout);
         start_etape = clock();
-        zyn_gen_map_humidity(map, width_x, depth_z,test_config);
+        zyn_gen_map_humidity(map, width_x, depth_z,&config);
         end_etape = clock();
         PRINT_BOTH("OK (%.4f sec)\n", ((double)(end_etape - start_etape)) / CLOCKS_PER_SEC);
     }
     /* =========================================================================
      * PHASE 4/5 : CALCUL MODÈLE HYDROGRAPHIQUE MACRO CHUNK (112 passes/s !)
      * ========================================================================= */
-    if (test_config != NULL && test_config->early_exit != 1 && test_config->with_rivers==1) {
+    ZynRiverNode* temporary_grid = NULL;
+    if (config.early_exit != 1 && config.with_rivers==1) {
         PRINT_BOTH("[4/5] Tracé du réseau hydrographique et inondation des fjords... ");
         fflush(stdout);
         start_etape = clock();
-        flux_grid=zyn_generate_all_rivers(map, seed, &out_nodes_count);
-/*        size_t total_chunks_monde = (size_t)width_x * (size_t)depth_z;
-        flux_grid = (uint32_t*)calloc(total_chunks_monde, sizeof(uint32_t));
-
-        start_etape = clock();
-        zyn_gen_map_river(map, width_x, depth_z, flux_grid,test_config);
- */       
+        temporary_grid=zyn_generate_all_rivers(map, seed, out_nodes_count);
         end_etape = clock();
         PRINT_BOTH("OK (%.4f sec)\n", ((double)(end_etape - start_etape)) / CLOCKS_PER_SEC);
+    }
+    if (out_flux_grid != NULL) {
+        *out_flux_grid = temporary_grid;
     }
     /* =========================================================================
      * PHASE 5/5 : ATTRIBUTION LOGIQUE DES BIOMES ET EXPORT CHROMATIQUE
      * ========================================================================= */
-    if (test_config != NULL && test_config->early_exit != 1) {
+    if (config.early_exit != 1) {
         PRINT_BOTH("[5/5] Évaluation de la matrice de Whittaker et classification... ");
         fflush(stdout);
 
         start_etape = clock();
-        zyn_gen_map_biome(map, width_x, depth_z,test_config);
+        zyn_gen_map_biome(map, width_x, depth_z,&config);
         end_etape = clock();
         PRINT_BOTH("OK (%.4f sec)\n", ((double)(end_etape - start_etape)) / CLOCKS_PER_SEC);
     }
@@ -128,31 +125,30 @@ int zyn_gen_map_macro(uint32_t seed, ZynTestConfig* test_config) {
     PRINT_BOTH("\n[EXPORT] Enregistrement des images PNG d'audit macro... \n");
     
     char img_filename[128];
-    sprintf(img_filename, "carte_relief_seed_%u_pas_%i.png", seed,test_config->target_step);
+    sprintf(img_filename, "carte_relief_seed_%u_pas_%i.png", seed,config.target_step);
     if (zyn_gen_png_elevation(map, width_x, depth_z, img_filename)) {
         PRINT_BOTH("  -> %s exportée avec succès.\n",img_filename);
     }
-    if (test_config != NULL && test_config->target_step>=5) {
-        sprintf(img_filename, "carte_temperature_seed_%u_pas_%i.png", seed,test_config->target_step);
+    if (config.target_step>=5) {
+        sprintf(img_filename, "carte_temperature_seed_%u_pas_%i.png", seed,config.target_step);
         if (zyn_gen_png_temperature(map, width_x, depth_z, img_filename)) {
             PRINT_BOTH("  -> %s exportée avec succès.\n",img_filename);
         }
     }
-    if (test_config != NULL && test_config->target_step>=6) {
-        sprintf(img_filename, "carte_humidite_seed_%u_pas_%i.png", seed,test_config->target_step);
+    if (config.target_step>=6) {
+        sprintf(img_filename, "carte_humidite_seed_%u_pas_%i.png", seed,config.target_step);
         if (zyn_gen_png_humidite(map, width_x, depth_z, img_filename)) {
             PRINT_BOTH("  -> %s exportée avec succès.\n",img_filename);
         }
     }
-    if (test_config != NULL && test_config->with_rivers==1 &&test_config->target_step>=7) {
-        sprintf(img_filename, "carte_rivieres_seed_%u_pas_%i.png", seed,test_config->target_step);
-        if (zyn_gen_png_rivers(map, width_x, depth_z, flux_grid, out_nodes_count,img_filename)) {
-            PRINT_BOTH("  -> %s exportée avec succès.\n",img_filename);
-            free(flux_grid);
+    if (config.with_rivers == 1 && config.target_step >= 7) {
+        sprintf(img_filename, "carte_rivieres_seed_%u_pas_%i.png", seed, config.target_step);
+        if (zyn_gen_png_rivers(map, width_x, depth_z, temporary_grid, *out_nodes_count, img_filename)) {
+            PRINT_BOTH("  -> %s exportée avec succès.\n", img_filename);
         }
     }
-    if (test_config != NULL && test_config->target_step>=8) {
-            sprintf(img_filename, "carte_biome_seed_%u_pas_%i.png", seed,test_config->target_step);
+    if (config.target_step>=8) {
+            sprintf(img_filename, "carte_biome_seed_%u_pas_%i.png", seed,config.target_step);
         if (zyn_gen_png_biomes(map, width_x, depth_z, img_filename)) {
             PRINT_BOTH("  -> %s exportée avec succès.\n",img_filename);
         }
@@ -163,7 +159,7 @@ int zyn_gen_map_macro(uint32_t seed, ZynTestConfig* test_config) {
     PRINT_BOTH(" GÉNERATION MACRO ENREGISTRÉE EN %.4f SECONDES\n", temps_total);
     PRINT_BOTH("=====================================================================\n");
     
-    if (test_config != NULL && test_config->active_test == 1) {
+    if (config.active_test == 1) {
         
         // RECONSTRUCTION TEMPORAIRE D'UN BUFFER FLOTTANT POUR NOTRE INSTRUMENT DE MESURE
         float* buffer_analyse = (float*)malloc(total_chunks * sizeof(float));
@@ -176,7 +172,7 @@ int zyn_gen_map_macro(uint32_t seed, ZynTestConfig* test_config) {
             float seuil_rupture = 2500.0f; 
             char step_label[64];
             sprintf(step_label, "SEED_%u", seed);
-            sprintf(step_label, "Pas d'arret : %i",test_config->target_step);
+            sprintf(step_label, "Pas d'arret : %i",config.target_step);
                 
             /* Appel de l'outil de continuité */
             zyn_test_verify_continuity(buffer_analyse, width_x, depth_z, seuil_rupture, seed, step_label);
@@ -184,7 +180,7 @@ int zyn_gen_map_macro(uint32_t seed, ZynTestConfig* test_config) {
             free(buffer_analyse);
         }
     }
-    if (test_config != NULL && test_config->active_test == 1 && test_config->target_step>=5) {
+    if (config.active_test == 1 && config.target_step>=5) {
         
         // RECONSTRUCTION TEMPORAIRE D'UN BUFFER FLOTTANT POUR NOTRE INSTRUMENT DE MESURE
         float* buffer_analyse = (float*)malloc(total_chunks * sizeof(float));
@@ -196,7 +192,7 @@ int zyn_gen_map_macro(uint32_t seed, ZynTestConfig* test_config) {
             float seuil_rupture = 2.0f; 
             char step_label[64];
             sprintf(step_label, "SEED_%u", seed);
-            sprintf(step_label, "Pas d'arret : %i",test_config->target_step);
+            sprintf(step_label, "Pas d'arret : %i",config.target_step);
                 
             /* Appel de l'outil de continuité */
             zyn_test_verify_continuity(buffer_analyse, width_x, depth_z, seuil_rupture, seed, step_label);
@@ -205,7 +201,7 @@ int zyn_gen_map_macro(uint32_t seed, ZynTestConfig* test_config) {
         }
     }
     
-    if (test_config != NULL && test_config->active_test == 1 && test_config->target_step==6) {
+    if (config.active_test == 1 && config.target_step==6) {
         
         // RECONSTRUCTION TEMPORAIRE D'UN BUFFER FLOTTANT POUR NOTRE INSTRUMENT DE MESURE
         float* buffer_analyse = (float*)malloc(total_chunks * sizeof(float));
@@ -217,7 +213,7 @@ int zyn_gen_map_macro(uint32_t seed, ZynTestConfig* test_config) {
             float seuil_rupture = 2.0f; 
             char step_label[64];
             sprintf(step_label, "SEED_%u", seed);
-            sprintf(step_label, "Pas d'arret : %i",test_config->target_step);
+            sprintf(step_label, "Pas d'arret : %i",config.target_step);
                 
             /* Appel de l'outil de continuité */
             zyn_test_verify_continuity(buffer_analyse, width_x, depth_z, seuil_rupture, seed, step_label);
@@ -225,6 +221,6 @@ int zyn_gen_map_macro(uint32_t seed, ZynTestConfig* test_config) {
             free(buffer_analyse);
         }
     }
-    free(map);
+
     return 0;
 }

@@ -70,7 +70,15 @@ int main(int argc, char** argv) {
     
     uint32_t single_seed = 0;
     int32_t use_single_seed = 0;
-
+    
+    size_t total_chunks = (size_t)ZYN_WORLD_MACRO_WIDTH_X * (size_t)ZYN_WORLD_MACRO_DEPTH_Z;
+    MacroChunk* map = (MacroChunk*)calloc(total_chunks , sizeof(MacroChunk));
+    if (map == NULL) {
+        fprintf(stderr, "Erreur fatale : Allocation de la grille Macro échouée.\n");
+        return 1;
+    }
+    ZynRiverNode*   flux_grid;
+    int32_t flux_count;
     /* ANALYSE DE LA LIGNE DE COMMANDE POUR CHERCHER UN ARGUMENT --seed */
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--seed") == 0 && (i + 1) < argc) {
@@ -105,7 +113,8 @@ int main(int argc, char** argv) {
     if (use_single_seed) {
         /* EXÉCUTION UNITAIRE */
         printf("[RUN UNIQUE] Évaluation de la Seed: %u\n", single_seed);
-        zyn_gen_map_macro(single_seed, &config);
+        zyn_gen_map_macro(map,single_seed,flux_grid,&flux_count, &config);
+        free(flux_grid);
     } else {
         /* EXÉCUTION EN BOUCLE */
         for (int32_t i = 0; i < config.stress_runs; i++) {
@@ -121,7 +130,8 @@ int main(int argc, char** argv) {
             }
 
             printf("\n[RUN %03d/%03d] Évaluation Seed: %u\n", i + 1, config.stress_runs, current_seed);
-            zyn_gen_map_macro(current_seed, &config);
+            zyn_gen_map_macro(map,current_seed,flux_grid,&flux_count &config);
+            free(flux_grid);
         }
     }
 
@@ -144,6 +154,8 @@ int main(int argc, char** argv) {
     printf("Temps moyen par carte    : %.2f ms / carte\n", temps_moyen_par_carte_ms);
     printf("Débit du pipeline        : %.0f Macro-Chunks / seconde\n", chunks_par_seconde);
     printf("==================================================\n\n");
+    
+    free(map);
 
     return EXIT_SUCCESS;
 }

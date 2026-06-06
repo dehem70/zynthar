@@ -121,15 +121,13 @@ int cmd_export_csv(const char *filename) {
         int z = sqlite3_column_int(stmt, 1);
         int biome = sqlite3_column_int(stmt, 2);
         uint8_t temp_raw = (uint8_t)sqlite3_column_int(stmt, 3);
-        uint8_t hum_raw = (uint8_t)sqlite3_column_int(stmt, 4);
         int16_t elev_dm = (int16_t)sqlite3_column_int(stmt, 5);
 
         // Re-conversion immédiate des unités brutes en unités physiques réelles pour le CSV
         float temp = RAW_TO_FLOAT(temp_raw);
-        float hum = RAW_TO_FLOAT(hum_raw);
         float elev = DM_TO_M(elev_dm);
 
-        fprintf(csv_file, "%d,%d,%d,%.4f,%.4f,%.1f\n", x, z, biome, temp, hum, elev);
+        fprintf(csv_file, "%d,%d,%d,%.4f,%.1f\n", x, z, biome, temp, elev);
         row_count++;
     }
 
@@ -200,8 +198,7 @@ int cmd_import_csv(const char *filename) {
     }
 
     const char *sql_insert = 
-        "INSERT INTO macro_chunks (chunk_x, chunk_z, biome_type, temperature, humidity, max_elevation) "
-        "VALUES (?, ?, ?, ?, ?, ?);";
+        "INSERT INTO macro_chunks (chunk_x, chunk_z, biome_type, temperature, max_elevation) VALUES (?, ?, ?, ?, ?);";
     
     rc = sqlite3_prepare_v2(db, sql_insert, -1, &stmt, 0);
     if (rc != SQLITE_OK) {
@@ -225,12 +222,11 @@ int cmd_import_csv(const char *filename) {
         }
 
         int x, z, biome;
-        double temp_input, hum_input, elev_input;
+        double temp_input, elev_input;
 
-        if (sscanf(line, "%d,%d,%d,%lf,%lf,%lf", &x, &z, &biome, &temp_input, &hum_input, &elev_input) == 6) {
+        if (sscanf(line, "%d,%d,%d,%lf,%lf", &x, &z, &biome, &temp_input, &elev_input) == 6) {
             // Sérialisation et packing immédiat vers notre structure d'octets légere
             uint8_t temp_raw = FLOAT_TO_RAW(temp_input);
-            uint8_t hum_raw = FLOAT_TO_RAW(hum_input);
             int16_t elev_dm = M_TO_DM(elev_input);
 
             sqlite3_reset(stmt);
@@ -238,7 +234,6 @@ int cmd_import_csv(const char *filename) {
             sqlite3_bind_int(stmt, 2, z);
             sqlite3_bind_int(stmt, 3, biome);
             sqlite3_bind_int(stmt, 4, temp_raw);
-            sqlite3_bind_int(stmt, 5, hum_raw);
             sqlite3_bind_int(stmt, 6, elev_dm);
 
             if (sqlite3_step(stmt) == SQLITE_DONE) {
@@ -266,8 +261,8 @@ int cmd_populate_random() {
     get_db_path(db_path, ZYN_DB_WORLD);
 
     // Calcul géométrique précis fondé sur le nouveau macro-chunk à 512 m [cite: 52]
-    int max_chunks_x = ZYN_WORLD_X_MAX / ZYN_MACRO_CHUNK_DIM_M;
-    int max_chunks_z = ZYN_WORLD_Z_MAX / ZYN_MACRO_CHUNK_DIM_M;
+    int max_chunks_x = ZYN_WORLD_MACRO_WIDTH_X;
+    int max_chunks_z = ZYN_WORLD_MACRO_DEPTH_Z ;
     long long total_chunks = (long long)max_chunks_x * max_chunks_z;
 
     printf("[*] Configuration globale de l'univers :\n");
@@ -301,8 +296,7 @@ int cmd_populate_random() {
     sqlite3_exec(db, "DELETE FROM macro_chunks;", 0, 0, 0);
 
     const char *sql_insert = 
-        "INSERT INTO macro_chunks (chunk_x, chunk_z, biome_type, temperature, humidity, max_elevation) "
-        "VALUES (?, ?, ?, ?, ?, ?);";
+        "INSERT INTO macro_chunks (chunk_x, chunk_z, biome_type, temperature, max_elevation) VALUES (?, ?, ?, ?, ?);";
 
     rc = sqlite3_prepare_v2(db, sql_insert, -1, &stmt, 0);
     if (rc != SQLITE_OK) {
@@ -333,13 +327,11 @@ int cmd_populate_random() {
             // Attribution brute respectant les bornes de notre structure
             uint8_t biome = (x32 % 12) + 1; // Évite BIOME_INCONNU (0)
             uint8_t temp_raw = x32 % 256;
-            uint8_t hum_raw = (x32 >> 8) % 256;
             int16_t elev_dm = min_dm + (int16_t)(x32 % range_dm);
 
             sqlite3_bind_int(stmt, 2, z);
             sqlite3_bind_int(stmt, 3, biome);
             sqlite3_bind_int(stmt, 4, temp_raw);
-            sqlite3_bind_int(stmt, 5, hum_raw);
             sqlite3_bind_int(stmt, 6, elev_dm);
 
             sqlite3_step(stmt);
@@ -372,8 +364,8 @@ int cmd_stress_test() {
     char db_path[512];
     get_db_path(db_path, ZYN_DB_WORLD);
 
-    int max_chunks_x = ZYN_WORLD_X_MAX / ZYN_MACRO_CHUNK_DIM_M;
-    int max_chunks_z = ZYN_WORLD_Z_MAX / ZYN_MACRO_CHUNK_DIM_M;
+    int max_chunks_x = ZYN_WORLD_MACRO_WIDTH_X ;
+    int max_chunks_z = ZYN_WORLD_MACRO_DEPTH_Z ;
     int num_queries = 10000;
 
     int rc = sqlite3_open(db_path, &db);
@@ -439,6 +431,9 @@ int cmd_initw() {
     sqlite3 *db;
     char *err_msg = 0;
     char db_path[512];
+    
+    //initialisation de la base relief
+    
     get_db_path(db_path, ZYN_DB_WORLD);
 
     int rc = sqlite3_open(db_path, &db);
@@ -453,14 +448,8 @@ int cmd_initw() {
     // Initialisation de la table avec notre structure optimisée (Champs typés INTEGER pour de légères charges)
     const char *sql_create_table = 
         "CREATE TABLE IF NOT EXISTS macro_chunks ("
-        "    chunk_x INTEGER,"
-        "    chunk_z INTEGER,"
-        "    biome_type INTEGER NOT NULL,"
-        "    temperature INTEGER,"
-        "    humidity INTEGER,"
-        "    max_elevation INTEGER,"
-        "    PRIMARY KEY (chunk_x, chunk_z)"
-        ");";
+        "    id INTEGER PRIMARY KEY,"
+        "    data BLOB);";
 
     rc = sqlite3_exec(db, sql_create_table, 0, 0, &err_msg);
     if (rc != SQLITE_OK) {
@@ -472,11 +461,42 @@ int cmd_initw() {
 
     printf("[+] Table 'macro_chunks' initialisée avec index composite (X, Z) avec succès.\n");
     sqlite3_close(db);
+    
+    //initialisation de la base riviere
+    
+    get_db_path(db_path, ZYN_DB_RIVER);
+
+    rc = sqlite3_open(db_path, &db);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "[-] Impossible d'ouvrir la base : %s\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
+        return 1;
+    }
+
+    printf("[+] Connexion à %s réussie.\n", db_path);
+
+    // Initialisation de la table avec notre structure optimisée (Champs typés INTEGER pour de légères charges)
+    const char *sql_create_table_river = 
+        "CREATE TABLE IF NOT EXISTS macro_chunks ("
+        "    id INTEGER PRIMARY KEY,"
+        "    data BLOB);";
+
+    rc = sqlite3_exec(db, sql_create_table_river, 0, 0, &err_msg);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "[-] Erreur SQL lors de la création de la table : %s\n", err_msg);
+        sqlite3_free(err_msg);
+        sqlite3_close(db);
+        return 1;
+    }
+
+    printf("[+] Table 'riviere' initialisée avec index composite (X, Z) avec succès.\n");
+    sqlite3_close(db);
+    
     return 0;
 }
 
-// Commande : add-macro <x> <z> <biome> <temp> <hum> <elev_m>
-int cmd_add_macro(int x, int z, int biome, double temp, double hum, double elev_m) {
+// Commande : add-macro <x> <z> <biome> <temp> <elev_m>
+int cmd_add_macro(int x, int z, int biome, double temp, double elev_m) {
     sqlite3 *db;
     sqlite3_stmt *stmt;
     char db_path[512];
@@ -490,8 +510,7 @@ int cmd_add_macro(int x, int z, int biome, double temp, double hum, double elev_
     }
 
     const char *sql_insert = 
-        "INSERT OR REPLACE INTO macro_chunks (chunk_x, chunk_z, biome_type, temperature, humidity, max_elevation) "
-        "VALUES (?, ?, ?, ?, ?, ?);";
+        "INSERT OR REPLACE INTO macro_chunks (chunk_x, chunk_z, biome_type, temperature, max_elevation) VALUES (?, ?, ?, ?, ?);";
 
     rc = sqlite3_prepare_v2(db, sql_insert, -1, &stmt, 0);
     if (rc != SQLITE_OK) {
@@ -502,14 +521,12 @@ int cmd_add_macro(int x, int z, int biome, double temp, double hum, double elev_
 
     // Packing à la volée avant écriture en base de données
     uint8_t temp_raw = FLOAT_TO_RAW(temp);
-    uint8_t hum_raw = FLOAT_TO_RAW(hum);
     int16_t elev_dm = M_TO_DM(elev_m);
 
     sqlite3_bind_int(stmt, 1, x);
     sqlite3_bind_int(stmt, 2, z);
     sqlite3_bind_int(stmt, 3, biome);
     sqlite3_bind_int(stmt, 4, temp_raw);
-    sqlite3_bind_int(stmt, 5, hum_raw);
     sqlite3_bind_int(stmt, 6, elev_dm);
 
     rc = sqlite3_step(stmt);
@@ -594,7 +611,7 @@ int main(int argc, char *argv[]) {
         return cmd_initw();
     }
     else if (strcmp(argv[1], "add-macro") == 0) {
-        if (argc < 8) {
+        if (argc < 7) {
             fprintf(stderr, "[-] Erreur : Paramètres manquants pour add-macro.\n");
             print_usage(argv[0]);
             return 1;
@@ -603,10 +620,9 @@ int main(int argc, char *argv[]) {
         int z = atoi(argv[3]);
         int biome = atoi(argv[4]);
         double temp = atof(argv[5]);
-        double hum = atof(argv[6]);
-        double elev = atof(argv[7]); // Reçoit la valeur métrique directe du terminal
+        double elev = atof(argv[6]); // Reçoit la valeur métrique directe du terminal
 
-        return cmd_add_macro(x, z, biome, temp, hum, elev);
+        return cmd_add_macro(x, z, biome, temp, elev);
     }
     else if (strcmp(argv[1], "export-csv") == 0) {
         if (argc < 3) {

@@ -1,0 +1,6 @@
+// En C, pour créer un ID unique à partir de X et Z :
+int32_t macro_id = ((int32_t)chunk_x << 16) | (chunk_z & 0xFFFF);
+
+// Et pour retrouver X et Z à partir de l'ID :
+int16_t x = (int16_t)(macro_id >> 16);
+int16_t z = (int16_t)(macro_id & 0xFFFF);

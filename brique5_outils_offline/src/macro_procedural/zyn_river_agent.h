@@ -14,10 +14,13 @@
 
 // Ta structure Node pour la base de données vectorielle dédiée
 typedef struct {
-    int32_t macro_x;       /* Coordonnée macro X */
-    int32_t macro_z;       /* Coordonnée macro Z (Axe longitudinal) */
-    uint8_t direction;     /* Direction d'écoulement vers le voisin macro (1 à 8) */
-    uint32_t flow_volume;  /* Débit ou volume accumulé */
+    uint8_t region_x;        /* 1 octets | Coordonnée region X */ 
+    uint8_t region_z;        /* 1 octets | Coordonnée region X */
+    uint8_t macro_x;         /* 1 octets | Coordonnée macro X */
+    uint8_t macro_z;         /* 1 octets | Coordonnée macro Z */
+    uint32_t data;           /* 4 octets :  Bits 17 à 20 (4 bits) : La direction (0 à 8)
+                                            Bits 0 à 16 (17 bits) : Le flow_volume (0 à 120 000)
+                                            Bits 21 à 31 (11 bits) : Libres / Inutilisés (mis à 0) */
 } ZynRiverNode;
 
 // Structure de l'Agent Marcheur Hydrographique (interne au générateur offline)
@@ -45,5 +48,9 @@ void river_grid_add_flow(int32_t x, int32_t z, uint32_t flow);
 
 uint32_t river_grid_get_flow(int32_t x, int32_t z);
 RiverAgent* river_get_agent_by_id(int32_t id);
+
+uint32_t pack_river_data(uint32_t volume, uint8_t direction);
+uint32_t unpack_volume(uint32_t packed_data);
+uint8_t unpack_direction(uint32_t packed_data);
 
 #endif // ZYN_RIVER_AGENT_H

@@ -383,12 +383,14 @@ void zyn_gen_map_relief_archipelago(MacroChunk* map, int32_t width_x, int32_t de
        INTERCEPTION ET COPIE DANS MAP SI ARRET PAS 1 DEMANDÉ
        ------------------------------------------------------------------------- */
     if (test_config != NULL && test_config->active_test == 1 && test_config->target_step == 1) {
-        for (int32_t z = 0; z < depth_z; z++) {
-            for (int32_t x = 0; x < width_x; x++) {
+        for (uint32_t z = 0; z < (uint32_t)depth_z; z++) {
+            for (uint32_t x = 0; x < (uint32_t)width_x; x++) {
                 size_t index = ZYN_INDEX(x, z, width_x);
                 map[index].elevation_max_dm = M_TO_DM((int16_t)(masque_voronoi[index] * ZYN_WORLD_Y_MAX));
-                map[index].chunk_x = x;
-                map[index].chunk_z = z;
+                map[index].region_x = (uint8_t)( x/256);
+                map[index].region_z = (uint8_t)( z/256);               
+                map[index].chunk_x = (uint8_t)( x%256);
+                map[index].chunk_z = (uint8_t)( z%256);
             }
         }
         free(masque_voronoi);
@@ -420,8 +422,10 @@ void zyn_gen_map_relief_archipelago(MacroChunk* map, int32_t width_x, int32_t de
                 else {
                     map[index].elevation_max_dm = M_TO_DM((int16_t)(-hauteurs_triees[index] * ZYN_WORLD_Y_MIN));
                 }
-                map[index].chunk_x = x;
-                map[index].chunk_z = z;
+                map[index].region_x = (uint8_t)( x/256);
+                map[index].region_z = (uint8_t)( z/256);               
+                map[index].chunk_x = (uint8_t)( x%256);
+                map[index].chunk_z = (uint8_t)( z%256);
             }
         }
         free(hauteurs_triees);
@@ -439,8 +443,6 @@ void zyn_gen_map_relief_archipelago(MacroChunk* map, int32_t width_x, int32_t de
             size_t index = ZYN_INDEX(x, z, width_x);
 
             map[index].elevation_max_dm = (int16_t)roundf(hauteurs_triees[index] * 10.0f);
-            map[index].chunk_x = x;
-            map[index].chunk_z = z;
         }
     }
 
@@ -583,7 +585,7 @@ void zyn_gen_map_relief(MacroChunk* map, int32_t width_x, int32_t depth_z, uint3
     
     /* Sécurité absolue : au moins 1 île */
     if (num_islands < 1) num_islands = 1;
-
+    
     printf("[RELIEF] Surface : %.0f Macro-Chunks | Base théorique : %.2f îles\n", surface, base_iles);
     printf("[RELIEF] Squelette de Voronoi initialisé déterministement avec %d centres d'îles (Variation: %.2f).", num_islands, variation);
     

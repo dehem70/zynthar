@@ -43,7 +43,7 @@ void zyn_gen_map_biome(MacroChunk* map, int32_t width_x, int32_t depth_z,ZynTest
         { ZYN_BIOME_DESERT,  ZYN_BIOME_DESERT,  ZYN_BIOME_DESERT,   ZYN_BIOME_PLAINE,   ZYN_BIOME_JUNGLE,   ZYN_BIOME_JUNGLE,   ZYN_BIOME_JUNGLE,  ZYN_BIOME_JUNGLE   }  /* T7 */
     };
 
-    size_t total_chunks = (size_t)width_x * (size_t)depth_z;
+    size_t total_chunks = (size_t)(ZYN_TOTAL_MACRO_CHUNKS);
     MacroChunk* chunk = map;
 
     /* Seuils d'altitudes convertis en décimètres pour les calculs d'étagement */
