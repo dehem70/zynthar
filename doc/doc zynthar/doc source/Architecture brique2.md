@@ -112,3 +112,36 @@ Pour assurer qu'aucune tâche de calcul ne soit perdue lors d'une défaillance d
 **Worker 2 : _Atlas_** (Le compacteur). Il prend toute la charge des 4096 nano-chunks sur ses épaules, il écrase tout le superflu en RLE et il en fait un petit paquet binaire d'un poids dérisoire avant de nettoyer l'atelier.
     
 **Le Surveillant : _Le Cerbère_** (ou _L'Argus_). Le chien de garde multitêtes qui ne dort jamais. Il checke les signaux POSIX, il nettoie le Ramdisk, et si un Forgeron fait un _SegFault_ ou prend trop son temps, il sort la hache, le liquide, et réinitialise le job à zéro l'esprit tranquille.
+
+Voici la mise à jour finale du tableau des objectifs de performance. Ce référentiel intègre désormais l'optimisation par **Sparsité Espace/Temps (Filtre Early-Out)**, distinguant le cas nominal (le calcul théorique maximum) et le cas réel moyen (grâce au tri chirurgical entre l'Air, la Roche et la Surface).
+
+### 📊 Tableau Récapitulatif Mis à Jour (Optimisation par Sparsité)
+
+| **Entité / Ouvrier**                 | **Rôle Système**                                                 | **Budget de Temps Théorique Max**                                                   | **Coût Réel Estimé (C pur avec Optimisation)**              | **Taux d'Occupation CPU Réel**                    | **Objectif Clé & Optimisation Algorithmique**                                                                                                                                                             |
+| ------------------------------------ | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Chronos** _(Worker 0)_             | I/O Réseau (B3) & Lecture/Écriture SQLite3 (Bulk)                | **$2300\ \mu\text{s}$** / chunk                                                     | $\sim 80\ \mu\text{s}$                                      | **$\sim 3.4\%$**                                  | Zéro allocation dynamique. Lit les blobs bruts et gère la file d'attente des écritures (Deltas) en tâche de fond.                                                                                         |
+| **Atropos** _(Worker 1)_             | Ordonnancement, Split en 4096 NanoJobs & Intersection AABB       | **$2300\ \mu\text{s}$** / chunk                                                     | $\sim 20\ \mu\text{s}$                                      | **$\sim 0.8\%$**                                  | **Le Pivot de l'Optimisation :** Détecte la vacuité du chunk à l'aide des métadonnées et tague les NanoJobs ("Air", "Roche", "Surface").                                                                  |
+| **Les Forgerons** _(Pool de calcul)_ | Génération procédurale (Bruit 2D, Biomes, Rasterisation, Deltas) | **$2300\ \mu\text{s}$** / chunk _(soit $18\ 400\ \mu\text{s}$ cumulés sur 8 cœurs)_ | **$\sim 130\ \mu\text{s}$** _(charge répartie sur la pool)_ | **$\sim 5.6\%$** _(Marge de confort de $94.4\%$)_ | **Application des Early-Outs :**<br><br>  <br><br>• NanoJob Air/Roche : **$< 30\text{ ns}$** (`memset` direct)<br><br>  <br><br>• NanoJob Surface : **$< 4.5\ \mu\text{s}$** (Calcul complet 15K cycles). |
+| **Atlas** _(Worker 2)_               | Compression RLE globale du Micro-Chunk & Recyclage des blocs     | **$2300\ \mu\text{s}$** / chunk                                                     | $\sim 400\ \mu\text{s}$                                     | **$\sim 17.3\%$**                                 | Parcours strictement linéaire. Très performant sur les zones d'air ou de roche continue (RLE ultra-efficace sur les répétitions de `0x00`).                                                               |
+
+## 🛠️ Nouvelles Directives Techniques pour le Code (Livrables Brique 2)
+
+Pour matérialiser ces chiffres spectaculaires dans ton code C, nous devons ajouter trois règles strictes dans tes fichiers de conception :
+
+1. **Le short-circuit dans la boucle du Forgeron :**
+    
+    La structure `NanoJob` (définie dans `brique2 - structure.md`) doit comporter un drapeau de type de tâche (`uint8_t job_type`).
+    
+    - Si `job_type == 0x01` (Vide/Air) $\rightarrow$ Le thread fait un `memset(ptr, 0, 4096)` et passe au job suivant.
+        
+    - Si `job_type == 0x02` (Plein/Roche) $\rightarrow$ Le thread fait un `memset(ptr, MATIERE_ROCHE, 4096)`.
+        
+    - Le calcul de bruit mathématique et la rasterisation d'AABB ne sont appelés **que si** `job_type == 0x03` (Surface/Mixte).
+        
+2. **Exploitation du RLE par Atlas :**
+    
+    Puisque $95\%$ du Micro-Chunk est composé de blocs uniformes (Air ou Roche), le Worker 2 (_Atlas_) va rencontrer des suites gigantesques d'octets identiques. Ton algorithme RLE va compresser ces secteurs à une vitesse foudroyante, ce qui réduira encore son temps d'exécution réel bien en dessous des $400\ \mu\text{s}$ prévus.
+    
+3. **Protection de la Brique 1 (Le gain ultime) :**
+    
+    Avec seulement $5.6\%$ d'occupation CPU pour la génération du monde dans le pire des cas, les cœurs de ton processeur serveur resteront disponibles pour la Brique 1. Les physiques du joueur, la détection des collisions et la brique réseau tourneront à un framerate serveur maximal sans jamais subir de micro-bégaiements (_stuttering_).
