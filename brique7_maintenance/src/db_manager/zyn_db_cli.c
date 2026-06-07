@@ -446,10 +446,10 @@ int cmd_initw() {
     printf("[+] Connexion à %s réussie.\n", db_path);
 
     // Initialisation de la table avec notre structure optimisée (Champs typés INTEGER pour de légères charges)
-    const char *sql_create_table = 
+    char *sql_create_table = 
         "CREATE TABLE IF NOT EXISTS macro_chunks ("
         "    id INTEGER PRIMARY KEY,"
-        "    data BLOB);";
+        "    data BLOB NOT NULL) WITHOUT ROWID;";
 
     rc = sqlite3_exec(db, sql_create_table, 0, 0, &err_msg);
     if (rc != SQLITE_OK) {
@@ -460,6 +460,22 @@ int cmd_initw() {
     }
 
     printf("[+] Table 'macro_chunks' initialisée avec index composite (X, Z) avec succès.\n");
+    
+    // Initialisation de la table avec notre structure optimisée (Champs typés INTEGER pour de légères charges)
+    sql_create_table = 
+        " CREATE TABLE IF NOT EXISTS world_metadata ("
+        " key TEXT PRIMARY KEY, value TEXT );";
+
+    rc = sqlite3_exec(db, sql_create_table, 0, 0, &err_msg);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "[-] Erreur SQL lors de la création de la table : %s\n", err_msg);
+        sqlite3_free(err_msg);
+        sqlite3_close(db);
+        return 1;
+    }
+
+    printf("[+] Table 'world_metadata' initialisée avec succès.\n");
+    
     sqlite3_close(db);
     
     //initialisation de la base riviere
@@ -479,7 +495,7 @@ int cmd_initw() {
     const char *sql_create_table_river = 
         "CREATE TABLE IF NOT EXISTS macro_chunks ("
         "    id INTEGER PRIMARY KEY,"
-        "    data BLOB);";
+        "    data BLOB NOT NULL) WITHOUT ROWID;";
 
     rc = sqlite3_exec(db, sql_create_table_river, 0, 0, &err_msg);
     if (rc != SQLITE_OK) {

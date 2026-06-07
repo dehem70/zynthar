@@ -13,6 +13,7 @@ endif()
 add_library(zynthar_shared INTERFACE)
 add_subdirectory(brique7_maintenance)
 add_subdirectory(brique5_outils_offline)
+add_subdirectory(brique2_persistance)
 
 # On indique à CMake où trouver les fichiers de cette cible
 target_include_directories(zynthar_shared INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/shared/include)

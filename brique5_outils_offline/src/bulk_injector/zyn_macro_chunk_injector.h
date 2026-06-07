@@ -31,5 +31,6 @@ typedef union {
  */
 int zyn_inject_macro_chunks(const MacroChunk* chunks, size_t count);
 int zyn_inject_macro_river(const ZynRiverNode*   flux_grid, size_t count);
+int zyn_store_world_metadata(uint32_t seed);
 
 #endif // ZYN_MACRO_CHUNK_INJECTOR_H

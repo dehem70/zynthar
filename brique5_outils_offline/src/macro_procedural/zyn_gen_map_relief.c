@@ -441,7 +441,10 @@ void zyn_gen_map_relief_archipelago(MacroChunk* map, int32_t width_x, int32_t de
     for (int32_t z = 0; z < depth_z; z++) {
         for (int32_t x = 0; x < width_x; x++) {
             size_t index = ZYN_INDEX(x, z, width_x);
-
+            map[index].region_x = (uint8_t)( x/256);
+            map[index].region_z = (uint8_t)( z/256);               
+            map[index].chunk_x = (uint8_t)( x%256);
+            map[index].chunk_z = (uint8_t)( z%256);
             map[index].elevation_max_dm = (int16_t)roundf(hauteurs_triees[index] * 10.0f);
         }
     }

@@ -27,7 +27,69 @@
 #include <time.h>
 
 
+int zyn_store_world_metadata(uint32_t seed) {
+    if (seed == 0) return -1;
 
+    const char* zyn_root = getenv("ZYNTHAR_ROOT");
+    if (!zyn_root) {
+        fprintf(stderr, "[ERROR] L'environnement ZYNTHAR_ROOT n'est pas défini.\n");
+        return -2;
+    }
+
+    char db_path[PATH_MAX_BUFFER];
+    snprintf(db_path, sizeof(db_path), "%s/%s%s", zyn_root, ZYN_DB_EMPLACEMENT, ZYN_DB_WORLD);
+
+    sqlite3* db = NULL;
+    int rc = sqlite3_open_v2(db_path, &db, SQLITE_OPEN_READWRITE, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "[ERROR] Impossible d'ouvrir la DB Relief pour les métadonnées : %s\n", sqlite3_errmsg(db));
+        if (db) sqlite3_close(db);
+        return -3;
+    }
+
+    // 1. Création de la table de métadonnées si elle n'existe pas
+    const char* create_table_query = 
+        "CREATE TABLE IF NOT EXISTS world_metadata ("
+        "key TEXT PRIMARY KEY, "
+        "value TEXT);";
+    
+    rc = sqlite3_exec(db, create_table_query, NULL, NULL, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "[ERROR] Impossible de créer la table world_metadata : %s\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
+        return -4;
+    }
+
+    // 2. Préparation de l'insertion de la graine
+    const char* insert_query = "INSERT OR REPLACE INTO world_metadata (key, value) VALUES (?, ?);";
+    sqlite3_stmt* stmt = NULL;
+    rc = sqlite3_prepare_v2(db, insert_query, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "[ERROR] Échec de préparation de la requête méta : %s\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
+        return -5;
+    }
+
+    // Bind de la clé 'world_seed'
+    sqlite3_bind_text(stmt, 1, "world_seed", -1, SQLITE_STATIC);
+
+    // Bind de la valeur de la seed convertie en chaîne
+    char seed_str[32];
+    snprintf(seed_str, sizeof(seed_str), "%u", seed);
+    sqlite3_bind_text(stmt, 2, seed_str, -1, SQLITE_STATIC);
+
+    rc = sqlite3_step(stmt);
+    if (rc != SQLITE_DONE) {
+        fprintf(stderr, "[ERROR] Impossible d'enregistrer la seed dans world_metadata : %s\n", sqlite3_errmsg(db));
+        sqlite3_finalize(stmt);
+        sqlite3_close(db);
+        return -6;
+    }
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return 0;
+}
 
 int zyn_inject_macro_chunks(const MacroChunk* chunks, size_t count) {
     clock_t start_global, end_global;
@@ -104,13 +166,30 @@ int zyn_inject_macro_chunks(const MacroChunk* chunks, size_t count) {
     for (size_t i = 0; i < count; i++) {
         sqlite3_reset(stmt);
         sqlite3_clear_bindings(stmt);
-        Id loc;
-        loc.rx=chunks[i].region_x;
-        loc.rz=chunks[i].region_z;
-        loc.x=chunks[i].chunk_x;
-        loc.z=chunks[i].chunk_z;
-        uint32_t macro_id = loc.id;
-        sqlite3_bind_int(stmt, 1, macro_id);
+        Id mapper;
+        mapper.rx = chunks[i].region_x;
+        mapper.rz = chunks[i].region_z;
+        mapper.x  = chunks[i].chunk_x;
+        mapper.z  = chunks[i].chunk_z; // Vaut 128 (0x80)
+
+        // 2. On extrait la clé primaire sous sa forme d'entier NON-SIGNÉ 32 bits
+        uint32_t clean_id = mapper.id; 
+
+        // clean_id vaut TRÈS EXACTEMENT 2147483648 (0x80000000) en RAM.
+
+        // 3. Liaison SQLite : On force le passage en 64 bits SANS CHANGER LES BITS
+        int64_t final_sqlite_id = (int64_t)clean_id;
+        sqlite3_bind_int(stmt, 1, final_sqlite_id);
+     /*   
+        // Même encodage binaire propre et explicite
+        int64_t macro_id = 0;
+        macro_id |= ((uint32_t)chunks[i].region_x << 0);
+        macro_id |= ((uint32_t)chunks[i].region_z << 8);
+        macro_id |= ((uint32_t)chunks[i].chunk_x << 16);
+        macro_id |= ((uint32_t)chunks[i].chunk_z << 24);
+   //     printf("%li macro_id %lu - %i %i %i %i \n",i,macro_id,chunks[i].region_x,chunks[i].region_z,chunks[i].chunk_x,chunks[i].chunk_z);
+        macro_id = macro_id & 0x00000000FFFFFFFFLL;
+        sqlite3_bind_int(stmt, 1, (sqlite3_int64)macro_id);*/
         sqlite3_bind_blob(stmt, 2, (const void *) &chunks[i], sizeof(MacroChunk), SQLITE_STATIC);
 
         rc = sqlite3_step(stmt);
@@ -220,13 +299,28 @@ int zyn_inject_macro_river(const ZynRiverNode*   flux_grid, size_t count) {
     for (size_t i = 0; i < count; i++) {
         sqlite3_reset(stmt);
         sqlite3_clear_bindings(stmt);
-        Id loc;
-        loc.rx=flux_grid[i].region_x;
-        loc.rz=flux_grid[i].region_z;
-        loc.x=flux_grid[i].macro_x;
-        loc.z=flux_grid[i].macro_z;
-        uint32_t macro_id = loc.id;
-        sqlite3_bind_int(stmt, 1, macro_id);
+/*        int64_t macro_id = 0;
+        macro_id |= ((uint32_t)flux_grid[i].region_x << 0);
+        macro_id |= ((uint32_t)flux_grid[i].region_z << 8);
+        macro_id |= ((uint32_t)flux_grid[i].macro_x << 16);
+        macro_id |= ((uint32_t)flux_grid[i].macro_z << 24);
+   //     printf("%li macro_id %lu - %i %i %i %i \n",i,macro_id,chunks[i].region_x,chunks[i].region_z,chunks[i].chunk_x,chunks[i].chunk_z);
+        macro_id = macro_id & 0x00000000FFFFFFFFLL;*/
+        
+        Id mapper;
+        mapper.rx = flux_grid[i].region_x;
+        mapper.rz = flux_grid[i].region_z;
+        mapper.x  = flux_grid[i].macro_x;
+        mapper.z  = flux_grid[i].macro_z; // Vaut 128 (0x80)
+
+        // 2. On extrait la clé primaire sous sa forme d'entier NON-SIGNÉ 32 bits
+        uint32_t clean_id = mapper.id; 
+
+        // clean_id vaut TRÈS EXACTEMENT 2147483648 (0x80000000) en RAM.
+
+        // 3. Liaison SQLite : On force le passage en 64 bits SANS CHANGER LES BITS
+        int64_t final_sqlite_id = (int64_t)clean_id;
+        sqlite3_bind_int(stmt, 1, final_sqlite_id);
         sqlite3_bind_blob(stmt, 2, (const void *) &flux_grid[i], sizeof(ZynRiverNode), SQLITE_STATIC);
 
         rc = sqlite3_step(stmt);

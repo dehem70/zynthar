@@ -32,6 +32,7 @@ int main(void) {
     srand((unsigned int)time(NULL));
     uint32_t world_seed = ((uint32_t)rand() << 16) | (uint32_t)rand();
     printf("[INFO] Graine du monde générée (Seed) : %lu\n", (unsigned long)world_seed);
+    
 
     // 2. Allocation dynamique de la Map (2 millions de macro-chunks)
     printf("[INFO] Allocation de la mémoire pour %d macro-chunks...\n", ZYN_TOTAL_MACRO_CHUNKS);
@@ -46,6 +47,14 @@ int main(void) {
     printf("[INFO] Génération mathématique du monde en cours...\n");
     zyn_gen_map_macro(world_map,world_seed,&flux_grid,&flux_count, NULL);
     printf("[INFO] Génération procédurale terminée avec succès.\n");
+    
+    // NEW : Sauvegarde de la graine du monde dans la table dédiée
+    printf("[INFO] Enregistrement de la graine globale dans les métadonnées...\n");
+    int db_status_metadata = zyn_store_world_metadata(world_seed);
+    if (db_status_metadata != 0) {
+        fprintf(stderr, "[ERROR] L'enregistrement des metadata a échoué (Code: %d).\n", db_status_metadata);
+        return EXIT_FAILURE;
+    }
 
     // 4. Enregistrement en masse (Bulk Insert) dans la base de données
     printf("[INFO] Injection de masse dans SQLite (Bulk Insert)... Cet étape cible < 10s.\n");
@@ -60,10 +69,10 @@ int main(void) {
         return EXIT_FAILURE;
     }
     if (db_status_river != 0) {
-        fprintf(stderr, "[ERROR] L'enregistrement de la carte relief a échoué (Code: %d).\n", db_status_river);
+        fprintf(stderr, "[ERROR] L'enregistrement de la carte riviere a échoué (Code: %d).\n", db_status_river);
         return EXIT_FAILURE;
     }
-
+    
     printf("[SUCCESS] La carte mondiale a été générée et persistée avec succès.\n");
     return EXIT_SUCCESS;
 }
