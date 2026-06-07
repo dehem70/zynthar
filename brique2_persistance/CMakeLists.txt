@@ -1,36 +1,39 @@
 # =============================================================================
 # ZYNTHAR v0.1 - CONFIGURATION CMAKE - BRIQUE 2 
 # =============================================================================
+
+# --- Détection des Dépendances ---
+find_package(Threads REQUIRED)
 find_package(SQLite3 REQUIRED)
+
 # Cela regroupe l'ensemble de nos briques algorithmiques pour qu'elles soient réutilisables
 add_library(zyn_sqlite_bindings STATIC
-    src/sqlite_bindings/zynthar_db.c
-    src/sqlite_bindings/zynthar_db.h
-    src/macro_access/macro_access.c
-    src/macro_access/macro_access.h
-)
-# Indiquer à CMake où trouver les en-têtes locaux de la brique procédurale
-target_include_directories(zyn_sqlite_bindings PUBLIC 
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/sqlite_bindings
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/macro_access
-    ${SQLite3_INCLUDE_DIRS}
+    src/Cerbere/zyn_cerbere.c
+    src/Chronos/zyn_chronos.c
 )
 
-# Liaison de la bibliothèque avec l'en-tête partagé global (zynthar.h)
-target_link_libraries(zyn_sqlite_bindings 
-    PRIVATE 
-        zynthar_shared
-    PUBLIC
-        ${SQLite3_LIBRARIES}
+# 🎯 CORRECTION 2 : La bibliothèque statique a AUSSI besoin de savoir où est zynthar.h
+# On lui lie également SQLite3 car Chronos y fait directement référence
+target_link_libraries(zyn_sqlite_bindings PUBLIC zynthar_shared SQLite::SQLite3 PRIVATE Threads::Threads m)
+
+# --- Cible Éxecutable Autonome : zyn_cerbere ---
+add_executable(zyn_cerbere src/Cerbere/zyn_cerbere.c)
+target_link_libraries(zyn_cerbere PRIVATE Threads::Threads zynthar_shared m)
+
+# --- Maximize Performance : Attribution automatique de la capacité CAP_SYS_ADMIN ---
+find_program(SETCAP_EXECUTABLE NAMES setcap HINTS /usr/sbin /sbin /usr/bin)
+if(NOT SETCAP_EXECUTABLE)
+    set(SETCAP_EXECUTABLE "/usr/sbin/setcap")
+endif()
+
+add_custom_command(TARGET zyn_cerbere POST_BUILD
+    COMMAND sudo ${SETCAP_EXECUTABLE} "cap_sys_admin+ep" $<TARGET_FILE:zyn_cerbere>
+    COMMENT "🔒 Attribution de la capacité CAP_SYS_ADMIN à zyn_cerbere"
 )
 
-# Stress-test brique2
-add_executable(zyn_brique2_stress src/zyn_brique2_stress.c)
-target_link_libraries(zyn_brique2_stress PRIVATE zyn_sqlite_bindings zynthar_shared m )
-set_target_properties(zyn_brique2_stress PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/brique2_persistance")
-target_include_directories(zyn_brique2_stress PRIVATE 
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/sqlite_bindings
-    ${SQLite3_INCLUDE_DIRS}
-)
+# --- Cible 2 : zyn_chronos ---
+add_executable(zyn_chronos src/Chronos/zyn_chronos.c)
+# 🎯 CORRECTION 3 : Utilisation de la cible moderne SQLite::SQLite3 initialisée par find_package
+target_link_libraries(zyn_chronos PRIVATE SQLite::SQLite3 zynthar_shared m)
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)

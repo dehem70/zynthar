@@ -12,17 +12,6 @@
 
 #define MAX_AGENTS        5000
 
-// Ta structure Node pour la base de données vectorielle dédiée
-typedef struct {
-    uint8_t region_x;        /* 1 octets | Coordonnée region X */ 
-    uint8_t region_z;        /* 1 octets | Coordonnée region X */
-    uint8_t macro_x;         /* 1 octets | Coordonnée macro X */
-    uint8_t macro_z;         /* 1 octets | Coordonnée macro Z */
-    uint32_t data;           /* 4 octets :  Bits 17 à 20 (4 bits) : La direction (0 à 8)
-                                            Bits 0 à 16 (17 bits) : Le flow_volume (0 à 120 000)
-                                            Bits 21 à 31 (11 bits) : Libres / Inutilisés (mis à 0) */
-} ZynRiverNode;
-
 // Structure de l'Agent Marcheur Hydrographique (interne au générateur offline)
 typedef struct {
     int32_t id;

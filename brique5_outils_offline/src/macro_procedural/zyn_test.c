@@ -113,7 +113,7 @@ int main(int argc, char** argv) {
     if (use_single_seed) {
         /* EXÉCUTION UNITAIRE */
         printf("[RUN UNIQUE] Évaluation de la Seed: %u\n", single_seed);
-        zyn_gen_map_macro(map,single_seed,flux_grid,&flux_count, &config);
+        zyn_gen_map_macro(map,single_seed,&flux_grid,&flux_count, &config);
         free(flux_grid);
     } else {
         /* EXÉCUTION EN BOUCLE */
@@ -130,7 +130,7 @@ int main(int argc, char** argv) {
             }
 
             printf("\n[RUN %03d/%03d] Évaluation Seed: %u\n", i + 1, config.stress_runs, current_seed);
-            zyn_gen_map_macro(map,current_seed,flux_grid,&flux_count &config);
+            zyn_gen_map_macro(map,current_seed,&flux_grid,&flux_count, &config);
             free(flux_grid);
         }
     }

@@ -48,9 +48,23 @@
               "icon": "lucide-file",
               "title": "Architecture brique2"
             }
+          },
+          {
+            "id": "9710c04dc72702d4",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "doc source/Architecture brique2.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Architecture brique2"
+            }
           }
         ],
-        "currentTab": 2
+        "currentTab": 3
       }
     ],
     "direction": "vertical"
@@ -211,8 +225,10 @@
       "bases:Créer une nouvelle base": false
     }
   },
-  "active": "c67fad2aab509df2",
+  "active": "9710c04dc72702d4",
   "lastOpenFiles": [
+    "doc source/zynthar.h.md",
+    "doc source/Architecture brique2.md",
     "doc générales projet/echelle_monde.md",
     "doc générales projet/liste des taches.md",
     "doc générales projet/Roadmap V0.1.md",
@@ -220,7 +236,6 @@
     "doc générales projet/base_theorique_communication.md",
     "doc générales projet/base_théorique_monde.md",
     "doc générales projet/base_théorique_joueur.md",
-    "doc source/Architecture brique2.md",
     "doc source/brique2 - structure.md",
     "doc source/schéma brique 2.md",
     "Sans titre.md",
