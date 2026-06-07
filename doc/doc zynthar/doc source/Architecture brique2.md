@@ -95,8 +95,20 @@ Le cache utilise une table de hachage globale partitionnée (sous-verrous atomiq
 
 Pour assurer qu'aucune tâche de calcul ne soit perdue lors d'une défaillance d'un thread, la file d'attente globale (Ring Buffer) n'est pas une simple liste de lecture, mais une table d'états atomique supervisée. Chaque `NanoJob` est tagué par un octet d'état (`uint8_t job_state`) et un identifiant de thread (`uint8_t worker_id`).
 
-|**Valeur de job_state**|**Désignation**|**Signification Technique**|
-|---|---|---|
-|`0x00`|**À FAIRE (A_FAIRE)**|Le job est prêt dans la file, en attente d'être pioché par un thread disponible.|
-|`0x01`|**EN COURS (EN_COURS)**|Le job a été pris. Le champ `worker_id` contient l'ID du thread actif.|
-|`0x02`|**TERMINÉ (TERMINE)**|Le thread a écrit son pointeur dans le contexte. Le job est extrait de la boucle de surveillance.|
+| **Valeur de job_state** | **Désignation**         | **Signification Technique**                                                                       |
+| ----------------------- | ----------------------- | ------------------------------------------------------------------------------------------------- |
+| `0x00`                  | **À FAIRE (A_FAIRE)**   | Le job est prêt dans la file, en attente d'être pioché par un thread disponible.                  |
+| `0x01`                  | **EN COURS (EN_COURS)** | Le job a été pris. Le champ `worker_id` contient l'ID du thread actif.                            |
+| `0x02`                  | **TERMINÉ (TERMINE)**   | Le thread a écrit son pointeur dans le contexte. Le job est extrait de la boucle de surveillance. |
+
+### Nommage des entités
+
+**Worker 0 : _Chronos_** (Le passeur). C'est lui qui gère le temps, les paquets réseau qui entrent et sortent, et qui va gratter le ramdisk. C'est le point d'ancrage avec le monde extérieur.
+
+ **Worker 1 : _Atropos_** (La cisaille). C'est la divinité qui coupe le destin... et ici, c'est le splitter qui découpe ton Micro-Chunk en 4096 NanoJobs chirurgicaux et qui tranche les AABB pour savoir si une maison déborde.
+
+**Le Pool de Workers de calcul : _Les Forgerons_** . Eux, ils ne voient jamais la RAM principale. Ils restent dans leur forge (le cache L1/L2), ils battent le fer mathématique (bruit, biomes, deltas) à coups de gigahertz et ils balancent les pointeurs à la chaîne.
+    
+**Worker 2 : _Atlas_** (Le compacteur). Il prend toute la charge des 4096 nano-chunks sur ses épaules, il écrase tout le superflu en RLE et il en fait un petit paquet binaire d'un poids dérisoire avant de nettoyer l'atelier.
+    
+**Le Surveillant : _Le Cerbère_** (ou _L'Argus_). Le chien de garde multitêtes qui ne dort jamais. Il checke les signaux POSIX, il nettoie le Ramdisk, et si un Forgeron fait un _SegFault_ ou prend trop son temps, il sort la hache, le liquide, et réinitialise le job à zéro l'esprit tranquille.
