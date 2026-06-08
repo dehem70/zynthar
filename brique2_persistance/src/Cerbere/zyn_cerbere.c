@@ -213,33 +213,18 @@ void cerbere_shutdown(void) {
     unlink(ram_river);
     unlink(ram_delta);
 
-    // 2. 💡 LE CASSE : Renommer le point de montage pour libérer l'espace nominal immédiatement
-    // Même si Linux dit "Busy", l'appel système rename() sur un répertoire est atomique.
-    char trash_path[1024];
-    snprintf(trash_path, sizeof(trash_path), "%s_trash_%d", ZYN_RAMDISK_PATH, (int)getpid());
-    
-    int renamed = 0;
-    if (rename(ZYN_RAMDISK_PATH, trash_path) == 0) {
-        fprintf(stdout, "[🔄 CERBÈRE] Point de montage déréférencé vers %s\n", trash_path);
-        renamed = 1;
-    } else {
-        fprintf(stderr, "[⚠️ CERBÈRE] Impossible de déréférencer le dossier : %s. Repli standard.\n", strerror(errno));
-    }
-
-    const char *target_to_unmount = renamed ? trash_path : ZYN_RAMDISK_PATH;
-
     // 3. Démontage synchrone sur la cible
     fprintf(stdout, "[🔌 CERBÈRE] Libération synchrone du point de montage tmpfs...\n");
-    if (umount(target_to_unmount) != 0) {
+    if (umount(ZYN_RAMDISK_PATH) != 0) {
         // Si le umount classique échoue encore, on utilise le mode LAZY pour forcer le kernel à purger
-        umount2(target_to_unmount, MNT_DETACH);
+        umount2(ZYN_RAMDISK_PATH, MNT_DETACH);
     }
 
     // Un micro-sommeil de sécurité pour laisser le VFS appliquer le détachement
     usleep(10000);
 
     // 4. Destruction physique du dossier
-    if (rmdir(target_to_unmount) == 0) {
+    if (rmdir(ZYN_RAMDISK_PATH) == 0) {
         fprintf(stdout, "[🗑️ CERBÈRE] Répertoire détruit proprement.\n");
     } else {
         // Si le code 16 persiste, il est confiné dans le dossier "trash", l'espace nominal est propre !
