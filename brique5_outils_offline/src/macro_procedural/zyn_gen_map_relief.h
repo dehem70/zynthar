@@ -81,4 +81,6 @@ float zyn_niv_mer_corrige(float* hauteurs_triees, size_t total_cases, double max
 
 void zyn_map_correction_niv_mer(float* hauteurs_triees, size_t total_cases, float niveau_mer_calcule);
 
+void zyn_gen_map_calcul_coin(MacroChunk* map, int32_t width_x, int32_t depth_z,ZynTestConfig* test_config);
+
 #endif /* ZYN_GEN_MAP_RELIEF_H */

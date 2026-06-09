@@ -93,6 +93,7 @@ int zyn_store_world_metadata(uint32_t seed) {
 
 int zyn_inject_macro_chunks(const MacroChunk* chunks, size_t count) {
     clock_t start_global, end_global;
+    MacroChunk_db temp;
     start_global = clock();
     if (!chunks || count == 0) {
         return -1;
@@ -170,7 +171,7 @@ int zyn_inject_macro_chunks(const MacroChunk* chunks, size_t count) {
         mapper.rx = chunks[i].region_x;
         mapper.rz = chunks[i].region_z;
         mapper.x  = chunks[i].chunk_x;
-        mapper.z  = chunks[i].chunk_z; // Vaut 128 (0x80)
+        mapper.z  = chunks[i].chunk_z; 
 
         // 2. On extrait la clé primaire sous sa forme d'entier NON-SIGNÉ 32 bits
         uint32_t clean_id = mapper.id; 
@@ -179,18 +180,17 @@ int zyn_inject_macro_chunks(const MacroChunk* chunks, size_t count) {
 
         // 3. Liaison SQLite : On force le passage en 64 bits SANS CHANGER LES BITS
         int64_t final_sqlite_id = (int64_t)clean_id;
-        sqlite3_bind_int(stmt, 1, final_sqlite_id);
-     /*   
-        // Même encodage binaire propre et explicite
-        int64_t macro_id = 0;
-        macro_id |= ((uint32_t)chunks[i].region_x << 0);
-        macro_id |= ((uint32_t)chunks[i].region_z << 8);
-        macro_id |= ((uint32_t)chunks[i].chunk_x << 16);
-        macro_id |= ((uint32_t)chunks[i].chunk_z << 24);
-   //     printf("%li macro_id %lu - %i %i %i %i \n",i,macro_id,chunks[i].region_x,chunks[i].region_z,chunks[i].chunk_x,chunks[i].chunk_z);
-        macro_id = macro_id & 0x00000000FFFFFFFFLL;
-        sqlite3_bind_int(stmt, 1, (sqlite3_int64)macro_id);*/
-        sqlite3_bind_blob(stmt, 2, (const void *) &chunks[i], sizeof(MacroChunk), SQLITE_STATIC);
+        sqlite3_bind_int64(stmt, 1, final_sqlite_id);
+        
+        temp.elevation_max_dm=chunks[i].elevation_max_dm;
+        temp.elevation_coin_nw=chunks[i].elevation_coin_nw; 
+        temp.elevation_coin_ne=chunks[i].elevation_coin_ne; 
+        temp.elevation_coin_se=chunks[i].elevation_coin_se; 
+        temp.elevation_coin_sw=chunks[i].elevation_coin_sw; 
+        temp.temperature_raw=chunks[i].temperature_raw;   
+        temp.biome=chunks[i].biome; 
+
+        sqlite3_bind_blob(stmt, 2, (const void *) &temp, sizeof(MacroChunk_db), SQLITE_STATIC);
 
         rc = sqlite3_step(stmt);
         if (rc != SQLITE_DONE) {

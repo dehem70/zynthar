@@ -93,7 +93,7 @@ int zyn_gen_map_macro(MacroChunk* map, uint32_t seed, ZynRiverNode** out_flux_gr
         PRINT_BOTH("OK (%.4f sec)\n", ((double)(end_etape - start_etape)) / CLOCKS_PER_SEC);
     }
     /* =========================================================================
-     * PHASE 4/5 : CALCUL MODÈLE HYDROGRAPHIQUE MACRO CHUNK (112 passes/s !)
+     * PHASE 4/5 : CALCUL MODÈLE HYDROGRAPHIQUE MACRO CHUNK 
      * ========================================================================= */
     ZynRiverNode* temporary_grid = NULL;
     if (config.early_exit != 1 && config.with_rivers==1) {

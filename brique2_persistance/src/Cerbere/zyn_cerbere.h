@@ -6,6 +6,11 @@
  * Fichier : zyn_cerbere.h
  * Date    : 07/06/2026
  * ============================================================================= */
+ 
+ #include <stdint.h>
+#include "zyn_b2_memory_pool.h"
+ 
+ 
 /**
  * @brief Initialise le Ramdisk, charge les bases de données SQLite3 en RAM
  * et démarre le thread de flush asynchrone.
@@ -18,4 +23,10 @@ int cerbere_init(void);
  * et termine proprement le processus.
  */
 void cerbere_shutdown(void);
+
+static int cerbere_allocate_shm_page(SharedMemoryPoolHeader *pool, int32_t idx);
+
+void cerbere_init_shm_pool(SharedMemoryPoolHeader *pool, int32_t initial_size);
+void* cerbere_shm_monitoring_thread(void *arg);
+void cerbere_cleanup_all_shm(SharedMemoryPoolHeader *pool) ;
 #endif // ZYN_CERBERE_H

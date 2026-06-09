@@ -11,15 +11,6 @@
 #include <zynthar.h>
 #include "zyn_river_agent.h"
 
-typedef union {
-    struct {
-        uint8_t z;    // Octet de poids faible (Bits 0-7)
-        uint8_t x;    // (Bits 8-15)
-        uint8_t rz;   // (Bits 16-23)
-        uint8_t rx;   // Octet de poids fort (Bits 24-31)
-    };
-    uint32_t id;     // Les 4 octets combinés en un seul entier
-} Id;
 
 /**
  * @brief Injecte un tableau de macro-chunks dans la base de données.

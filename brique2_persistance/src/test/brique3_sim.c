@@ -39,11 +39,13 @@ typedef struct __attribute__((packed)) {
 
 typedef union {
     struct {
-        int16_t x;
-        int16_t z;
-    } coord;
-    uint32_t id;
-} MacroKey;
+        uint8_t z;    // Octet de poids faible (Bits 0-7)
+        uint8_t x;    // (Bits 8-15)
+        uint8_t rz;   // (Bits 16-23)
+        uint8_t rx;   // Octet de poids fort (Bits 24-31)
+    };
+    uint32_t id;     // Les 4 octets combinés en un seul entier
+} Id;
 
 // Interception du Ctrl+C pour fermer la connexion proprement
 void handle_sigint(int sig) {
@@ -129,14 +131,21 @@ int sock = 0;
         }
 
         // Forgeage de la clé et du paquet
-        MacroKey key;
-        key.coord.x = (int16_t)macro_x;
-        key.coord.z = (int16_t)macro_z;
+        Id id;
+        
+    
+        
+        id.rx = (uint8_t)(macro_x/256);
+        id.rz = (uint8_t)(macro_z/256);
+        id.x=(uint8_t)(macro_x-256*id.rx);
+        id.z=(uint8_t)(macro_z-256*id.rz);
 
-        request.macro_chunk_id = htonl(key.id);
+        request.macro_chunk_id = htonl(id.id);
+        
         request.mc_x = (uint8_t)x;
         request.mc_y = (uint8_t)y;
         request.mc_z = (uint8_t)z;
+        
         request.lod  = (uint8_t)lod_val;
 
         // ------------------------------------------------------------------

@@ -565,6 +565,61 @@ void zyn_gen_map_relief_smooth_coastlines(MacroChunk* map, int32_t width_x, int3
     }
 }
 
+
+void zyn_gen_map_calcul_coin(MacroChunk* map, int32_t width_x, int32_t depth_z,ZynTestConfig* test_config) {
+    if (map == NULL || width_x <= 0 || depth_z <= 0 ) return;
+
+    size_t total_cases = (size_t)width_x * (size_t)depth_z;
+    
+   /* parcourt de la grille  */
+    for (int32_t z = 0; z < depth_z; z++) {
+        for (int32_t x = 0; x < width_x; x++) {
+            int32_t xm1;
+            int32_t xp1;
+            int32_t zm1;
+            int32_t zp1;
+            if (x>0) {
+               xm1=x-1;
+            } else {
+               xm1=width_x-1;
+            }
+            if (x<width_x-1) {
+               xp1=x+1;
+            } else {
+               xp1=0;
+            }
+            if (z>0) {
+               zm1=z-1;
+            } else {
+               zm1=depth_z-1;
+            }
+            if (z<depth_z-1) {
+               zp1=z+1;
+            } else {
+               zp1=0;
+            }
+            
+            size_t idx = ZYN_INDEX(x, z, width_x);
+            size_t idx_nw = ZYN_INDEX(xm1, zm1, width_x);
+            size_t idx_n = ZYN_INDEX(x, zm1, width_x);
+            size_t idx_ne = ZYN_INDEX(xp1, zm1, width_x);
+            size_t idx_e = ZYN_INDEX(xp1, z, width_x);
+            size_t idx_se = ZYN_INDEX(xp1, zp1, width_x);
+            size_t idx_s = ZYN_INDEX(x, zp1, width_x);
+            size_t idx_sw = ZYN_INDEX(xm1, zp1, width_x);
+            size_t idx_w = ZYN_INDEX(xm1, z, width_x);
+            
+            map[idx].elevation_coin_nw=(uint16_t)((map[idx_n].elevation_max_dm+map[idx_nw].elevation_max_dm+map[idx_w].elevation_max_dm)/3);
+            map[idx].elevation_coin_sw=(uint16_t)((map[idx_s].elevation_max_dm+map[idx_sw].elevation_max_dm+map[idx_w].elevation_max_dm)/3);
+            map[idx].elevation_coin_ne=(uint16_t)((map[idx_n].elevation_max_dm+map[idx_ne].elevation_max_dm+map[idx_e].elevation_max_dm)/3);
+            map[idx].elevation_coin_se=(uint16_t)((map[idx_s].elevation_max_dm+map[idx_se].elevation_max_dm+map[idx_e].elevation_max_dm)/3);
+        }
+    }
+    return;
+}
+
+
+
 /* =============================================================================
  * POINT D'ENTRÉE DU MODULE : NOMBRE D'ÎLES ET VARIATION TOTALE
  * ============================================================================= */
@@ -599,4 +654,6 @@ void zyn_gen_map_relief(MacroChunk* map, int32_t width_x, int32_t depth_z, uint3
 
     /* Lissage final des traits de côtes */
     zyn_gen_map_relief_smooth_coastlines(map, width_x, depth_z, 2,test_config);
+    
+    zyn_gen_map_calcul_coin(map,width_x,depth_z,test_config);
 }

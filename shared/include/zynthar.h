@@ -138,14 +138,28 @@ int stbi_write_png(char const *filename, int w, int h, int comp, void const *dat
  * Alignement machine parfait (4 octets), aucun padding compilateur (zéro gâchis de RAM).
  */
 typedef struct {
-    uint8_t region_x;         /* 1 octet  | Coordonnée majeure de région X */ 
-    uint8_t region_z;         /* 1 octet  | Coordonnée majeure de région Z */
-    uint8_t chunk_x;          /* 1 octet  | Coordonnée macro relative X (0 à 255) */
-    uint8_t chunk_z;          /* 1 octet  | Coordonnée macro relative Z (0 à 255) */
-    int16_t elevation_max_dm; /* 2 octets | Altitude max en décimètres (-10240 à +20480) */
-    uint8_t temperature_raw;  /* 1 octet  | Température quantisée normalisée (0 à 255) */
-    uint8_t biome;            /* 1 octet  | ID unique du biome de surface (ZYN_BIOME_*) */
+    uint8_t region_x;          /* 1 octet  | Coordonnée majeure de région X */ 
+    uint8_t region_z;          /* 1 octet  | Coordonnée majeure de région Z */
+    uint8_t chunk_x;           /* 1 octet  | Coordonnée macro relative X (0 à 255) */
+    uint8_t chunk_z;           /* 1 octet  | Coordonnée macro relative Z (0 à 255) */
+    int16_t elevation_max_dm;  /* 2 octets | Altitude max en décimètres (-10240 à +20480) */
+    int16_t elevation_coin_nw; /* 2 octets | Altitude max en décimètres (-10240 à +20480) */
+    int16_t elevation_coin_ne; /* 2 octets | Altitude max en décimètres (-10240 à +20480) */
+    int16_t elevation_coin_se; /* 2 octets | Altitude max en décimètres (-10240 à +20480) */
+    int16_t elevation_coin_sw; /* 2 octets | Altitude max en décimètres (-10240 à +20480) */
+    uint8_t temperature_raw;   /* 1 octet  | Température quantisée normalisée (0 à 255) */
+    uint8_t biome;             /* 1 octet  | ID unique du biome de surface (ZYN_BIOME_*) */
 } MacroChunk;
+
+typedef struct {
+    int16_t elevation_max_dm;  /* 2 octets | Altitude max globale */
+    int16_t elevation_coin_nw; /* 2 octets | Altitude Nord-Ouest */
+    int16_t elevation_coin_ne; /* 2 octets | Altitude Nord-Est */
+    int16_t elevation_coin_se; /* 2 octets | Altitude Sud-Est */
+    int16_t elevation_coin_sw; /* 2 octets | Altitude Sud-Ouest */
+    uint8_t temperature_raw;   /* 1 octet  | Température */
+    uint8_t biome;             /* 1 octet  | ID unique du biome */
+} MacroChunk_db; // Taille totale en RAM : 12 octets tout pile, aucun padding !
 
 // Ta structure Node pour la base de données vectorielle dédiée
 typedef struct {
@@ -164,11 +178,13 @@ typedef struct {
  */
 typedef union {
     struct {
-        int16_t x;
-        int16_t z;
-    } coord;
-    uint32_t id;
-} MacroKey;
+        uint8_t z;    // Octet de poids faible (Bits 0-7)
+        uint8_t x;    // (Bits 8-15)
+        uint8_t rz;   // (Bits 16-23)
+        uint8_t rx;   // Octet de poids fort (Bits 24-31)
+    };
+    uint32_t id;     // Les 4 octets combinés en un seul entier
+} Id;
 
 /**
  * @brief Configuration de staging extraite du fichier de configuration global.

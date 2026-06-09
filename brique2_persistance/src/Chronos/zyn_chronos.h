@@ -6,7 +6,13 @@
  * Fichier : zyn_chronos.h
  * Date    : 07/06/2026
  * ============================================================================= */
+#include "zyn_b2_memory_pool.h" // 🎯 AJOUT pour que Chronos connaisse la structure SHM
 
+/**
+ * @brief Point d'entrée de la boucle réseau et d'accès SQLite3 de Chronos.
+ * @param pool Pointeur mappé vers le segment de contrôle SHM maître.
+ */
+void chronos_run(SharedMemoryPoolHeader *pool,int server_fd,struct sockaddr_in address,int addrlen,mqd_t atropos_mq);
 /**
  * @brief Initialise les handles SQLite3 en ouvrant les bases depuis le Ramdisk
  * et applique les PRAGMA de performance optimisés.
