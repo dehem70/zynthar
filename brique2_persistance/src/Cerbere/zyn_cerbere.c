@@ -31,6 +31,7 @@
 #include <zynthar.h>
 #include "zyn_cerbere.h"
 #include "zyn_b2_memory_pool.h"
+#include "zyn_chronos_utils.h"
 
 static WatchdogArgs watchdog_context = {0};
 static pthread_t backup_thread_id;
@@ -115,12 +116,87 @@ for (uint64_t i = 0; i < NANO_QUEUE_SIZE; i++) {
     }
     printf("[🐕 CERBÈRE] FIFO initiale chaînée : Tête -> Page %d | Queue -> Page %d\n", pool->head_idx, pool->tail_idx);
 }
+
+void* cerbere_shm_monitoring_thread(void *arg) {
+    SharedMemoryPoolHeader *pool = (SharedMemoryPoolHeader *)arg;
+    printf("[🔍 CERBÈRE] Lancement du thread de surveillance de la SHM maître...\n");
+
+    while (g_cerbere_running) {
+        sleep(1); // Inspection rythmée toutes les secondes
+
+        // A. Sécurité d'initialisation : On attend que Cerbère ait configuré un watermark cohérent
+        uint32_t watermark = __atomic_load_n(&pool->low_watermark, __ATOMIC_ACQUIRE);
+        if (watermark == 0 || watermark > MAX_POOL_PAGES) {
+            continue; // La SHM n'est pas encore prête ou est en cours d'initialisation
+        }
+
+        // B. Lecture atomique du nombre de pages actuellement disponibles dans la FIFO
+        uint32_t free_count = __atomic_load_n(&pool->current_count, __ATOMIC_ACQUIRE);
+        
+        // C. Seuil critique franchi ?
+        if (free_count < watermark) {
+            printf("[⚠️ CERBÈRE] Alerte SHM : Nombre de pages libres (%u) sous le seuil critique (%u) !\n", 
+                   free_count, watermark);
+            
+            int page_injectee = 0;
+
+            // D. On cherche une node physique *non encore allouée* d'après ton référentiel (is_allocated == 0)
+            for (int32_t i = 0; i < MAX_POOL_PAGES; i++) {
+                
+                // 🎯 SOLUTION AU BUG INDEX 0 : On cible uniquement les slots vierges
+                if (pool->nodes[i].is_allocated == 0) {
+                    
+                    printf("[⚙️ CERBÈRE] Ravitaillement : Allocation dynamique de la page SHM Index %d...\n", i);
+                    
+                    // 1. Allocation physique (mmap / ftruncate du fichier de 16 Mo)
+                    if (cerbere_allocate_shm_page(pool, i) == 0) {
+                        
+                        // 2. Configuration des métadonnées applicatives
+                        pool->nodes[i].context.status = 255; // ZYN_STATUS_FREE
+                        pool->nodes[i].next_free_idx = -1;  // Elle va devenir la nouvelle fin de file
+                        
+                        // 3. 🎯 INSERTION SÉCURISÉE DANS LA FIFO (Sous protection du verrou du pool)
+                        pthread_mutex_lock(&pool->lock);
+                        
+                        if (pool->head_idx == -1) {
+                            // Si la file était totalement vide
+                            pool->head_idx = i;
+                        } else {
+                            // On raccorde l'ancienne queue à notre nouvelle page
+                            pool->nodes[pool->tail_idx].next_free_idx = i;
+                        }
+                        
+                        pool->tail_idx = i; // La queue devient notre nouvelle page
+                        pool->current_count++;
+                        
+                        // On réveille un composant (Chronos) qui attendrait éventuellement sur la condition
+                        pthread_cond_signal(&pool->cond_free);
+                        
+                        pthread_mutex_unlock(&pool->lock);
+                        
+                        printf("[✅ CERBÈRE] Ravitaillement réussi ! Page %d injectée à la queue de la FIFO.\n", i);
+                        page_injectee = 1;
+                        break; // 🎯 Mission accomplie pour cette seconde-ci !
+                    } else {
+                        fprintf(stderr, "[❌ CERBÈRE] Échec de l'allocation physique pour le slot %d\n", i);
+                    }
+                }
+            }
+
+            if (!page_injectee) {
+                fprintf(stderr, "[🚨 CERBÈRE] Alerte saturation : Plus aucun slot libre dans le tableau de taille maximale (%d) !\n", MAX_POOL_PAGES);
+            }
+        }
+    }
+    return NULL;
+}
+/*
 void* cerbere_shm_monitoring_thread(void *arg) {
     SharedMemoryPoolHeader *pool = (SharedMemoryPoolHeader*)arg;
     uint32_t loop_counter = 0;
 
     while (1) {
-/*        usleep(10000); // 10ms
+        usleep(10000); // 10ms
         loop_counter++;
 
         pthread_mutex_lock(&pool->lock);
@@ -199,11 +275,11 @@ void* cerbere_shm_monitoring_thread(void *arg) {
                 }
             }
             pthread_mutex_unlock(&pool->lock);
-        }*/
+        }
         sleep(1);
     }
     return NULL;
-}
+}*/
 /**
  * @brief Parseur de configuration linéaire (zéro allocation dynamique).
  */

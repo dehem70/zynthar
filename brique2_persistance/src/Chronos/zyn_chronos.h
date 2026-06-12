@@ -12,15 +12,6 @@
 #include <netinet/in.h>
 #include "zyn_b2_memory_pool.h" // 🎯 AJOUT pour que Chronos connaisse la structure SHM
 
-/**
- * @brief Point d'entrée de la boucle réseau et d'accès SQLite3 de Chronos.
- * @param pool Pointeur mappé vers le segment de contrôle SHM maître.
- */
-void chronos_run(SharedMemoryPoolHeader *pool, int server_fd, struct sockaddr_in address, int addrlen, mqd_t atropos_mq);
-
-static uint8_t* chronos_get_and_map_page(SharedMemoryPoolHeader *pool, int32_t idx);
-static void chronos_push_shm_context(SharedMemoryPoolHeader *pool, int32_t free_idx);
-static int32_t chronos_pop_shm_context(SharedMemoryPoolHeader *pool);
 
 
 /* * Structure du paquet de demande (Request Packet)
@@ -33,6 +24,12 @@ typedef struct __attribute__((packed)) {
     uint8_t mc_z;
     uint8_t lod;
 } ChunkRequestPacket;
+
+typedef struct {
+    const char *path;       // Chemin physique sur le Ramdisk (ex: path_river)
+    const char *alias;      // Nom logique dans SQLite (ex: "rivers")
+    uint8_t is_main;        // 1 pour la base maîtresse principale, 0 pour un ATTACH
+} ChronosDatabaseTarget;
 
 typedef struct {
     SharedMemoryPoolHeader *pool;

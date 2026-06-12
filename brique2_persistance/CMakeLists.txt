@@ -7,11 +7,11 @@ find_package(Threads REQUIRED)
 find_package(SQLite3 REQUIRED)
 
 # --- Cible Éxecutable Autonome : zyn_cerbere ---
-add_executable(zyn_cerbere src/Cerbere/zyn_cerbere.c)
-target_link_libraries(zyn_cerbere PRIVATE Threads::Threads zynthar_shared rt m)
+add_executable(zyn_cerbere src/Cerbere/zyn_cerbere.c src/Chronos/zyn_chronos_utils.c)
+target_link_libraries(zyn_cerbere PRIVATE SQLite::SQLite3 Threads::Threads zynthar_shared rt m)
 
 # 🎯 AJOUT : Spécifie au compilateur d'inclure le dossier include/ pour zyn_cerbere
-target_include_directories(zyn_cerbere PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(zyn_cerbere PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src/Chronos)
 
 # --- Maximize Performance : Attribution automatique de la capacité CAP_SYS_ADMIN ---
 find_program(SETCAP_EXECUTABLE NAMES setcap HINTS /usr/sbin /sbin /usr/bin)
@@ -25,7 +25,7 @@ add_custom_command(TARGET zyn_cerbere POST_BUILD
 )
 
 # --- Cible 2 : zyn_chronos ---
-add_executable(zyn_chronos src/Chronos/zyn_chronos.c )
+add_executable(zyn_chronos src/Chronos/zyn_chronos.c src/Chronos/zyn_chronos_utils.c)
 # 🎯 CORRECTION 3 : Utilisation de la cible moderne SQLite::SQLite3 initialisée par find_package
 target_link_libraries(zyn_chronos PRIVATE SQLite::SQLite3 zynthar_shared rt m)
 # 🎯 AJOUT : Spécifie au compilateur d'inclure le dossier include/ pour zyn_cerbere
