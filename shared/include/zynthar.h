@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include <math.h>
 
+
+
+#define ZYN_LOG_DEBUG  0
+
 // ============================================================================
 // [SECTION 0] MACROS UTILITAIRES & LIENS EXTERNES
 // ============================================================================
@@ -127,11 +131,14 @@ int stbi_write_png(char const *filename, int w, int h, int comp, void const *dat
 #define FLOAT_TO_RAW(f) ((uint8_t)(roundf(((f) - (ZYN_WORLD_TEMP_MIN)) / ((ZYN_WORLD_TEMP_MAX) - (ZYN_WORLD_TEMP_MIN)) * 255.0f)))
 #define RAW_TO_FLOAT(r) ((float)(ZYN_WORLD_TEMP_MIN) + (((float)(r) / 255.0f) * ((float)(ZYN_WORLD_TEMP_MAX) - (ZYN_WORLD_TEMP_MIN))))
 
-
+#define NB_FORGERONS 8
 // ============================================================================
 // [SECTION 5] TYPES DE DONNÉES & STRUCTURES MÉMOIRE MAÎTRESSE
 // ============================================================================
-
+#define ZYN_STATUS_COMPUTING 0
+#define ZYN_STATUS_READY 1
+#define ZYN_STATUS_COMPRESSED 3
+#define ZYN_STATUS_FREE        255
 /**
  * @brief Structure ultra-optimisée représentant un MacroChunk.
  * Poids total : Égal à 8 octets.
