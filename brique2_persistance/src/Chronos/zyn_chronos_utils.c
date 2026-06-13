@@ -26,6 +26,121 @@
 #include <sqlite3.h>
 #include "zyn_chronos_utils.h"
 #include "zyn_chronos.h"
+#include "../Hecate/zyn_hecate.h"
+#include "../Hecate/zyn_hecate_utils.h"
+
+#define ZYN_EARLY_OUT_NONE   0
+#define ZYN_EARLY_OUT_AIR    1
+#define ZYN_EARLY_OUT_ROCHE  2
+#define ZYN_EARLY_OUT_EAU    3
+
+
+// Définition des variables globales
+HecateRegion* g_hecate_regions = NULL;
+HecateLevel2Node* g_hecate_layer2_pool = NULL;
+
+void zyn_chronos_attach_hecate_shm(void) {
+    // A. Attachement à la Couche 1 d'Hécate
+    int c1_fd = shm_open(HECATE_SHM_NAME_L1, O_RDONLY, 0666);
+    if (c1_fd == -1) {
+        perror("[❌ CHRONOS] Impossible d'ouvrir la SHM Couche 1 d'Hécate");
+        exit(EXIT_FAILURE);
+    }
+    
+    // Calcul de la taille de ta Couche 1 (Régions * taille d'une région)
+    size_t c1_size = ZYN_TOTAL_REGIONS * sizeof(HecateRegion); 
+    
+    g_hecate_regions = (HecateRegion*)mmap(NULL, c1_size, PROT_READ, MAP_SHARED, c1_fd, 0);
+    close(c1_fd);
+    
+    if (g_hecate_regions == MAP_FAILED) {
+        perror("[❌ CHRONOS] Échec mmap de la Couche 1 d'Hécate");
+        exit(EXIT_FAILURE);
+    }
+
+    // B. Attachement à la Couche 2 (le pool de 43 millions de tranches)
+    int c2_fd = shm_open(HECATE_SHM_NAME_L2, O_RDONLY, 0666);
+    if (c2_fd == -1) {
+        perror("[❌ CHRONOS] Impossible d'ouvrir la SHM Couche 2 d'Hécate");
+        exit(EXIT_FAILURE);
+    }
+    
+    // Taille exacte de ton pool Couche 2 (52988220 tranches * 4 octets)
+    size_t c2_size = 52988220 * sizeof(HecateLevel2Node); 
+    
+    g_hecate_layer2_pool = (HecateLevel2Node*)mmap(NULL, c2_size, PROT_READ, MAP_SHARED, c2_fd, 0);
+    close(c2_fd);
+    
+    if (g_hecate_layer2_pool == MAP_FAILED) {
+        perror("[❌ CHRONOS] Échec mmap de la Couche 2 d'Hécate");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("[🔗 CHRONOS] Raccordement à l'infrastructure géologique d'Hécate réussi ! (Couches 1 & 2 connectées)\n");
+}
+/**
+ * @brief Évalue en O(1) si le Micro-Chunk demandé est uniforme via les Couches 1 & 2 d'Hécate.
+ * @return ZYN_EARLY_OUT_AIR, ZYN_EARLY_OUT_ROCHE, ou ZYN_EARLY_OUT_NONE si complexe.
+ */
+int zyn_chronos_early_out_eval(uint32_t macro_chunk_id, uint8_t mc_x, uint8_t mc_y, uint8_t mc_z) {
+    // 🛑 GARDE-FOU 1 : Vérification que Chronos a bien accès aux SHM d'Hécate
+    if (g_hecate_regions == NULL || g_hecate_layer2_pool == NULL) {
+        // Si les pointeurs ne sont pas mappés dans ce processus, on ne crash pas :
+        // on désactive l'early out pour laisser le pipeline nominal s'en charger.
+        perror("[❌ CHRONOS] pointeur pour shm Hecate NULL");
+        return ZYN_EARLY_OUT_NONE; 
+    }
+    Id id;
+    id.id=macro_chunk_id;
+    // 1. Dépaquetage de ton Id Zynthar (rx, rz, x, z) depuis le macro_chunk_id
+    // On assume ici les masques standards de ton type Id
+    uint32_t rx = id.rx; 
+    uint32_t rz = id.rz;
+    uint32_t mx = id.x;
+    uint32_t mz = id.z;
+
+    uint32_t region_idx  = rx + (rz * ZYN_WORLD_REGION_X);
+    uint32_t colonne_idx = mx + (mz * ZYN_WORLD_MACRO_DIM);
+    
+    // 🛑 GARDE-FOU 2 : Sécurité sur la grille horizontale
+    if (region_idx >= ZYN_TOTAL_REGIONS || colonne_idx >= (ZYN_WORLD_MACRO_DIM * ZYN_WORLD_MACRO_DIM)) {
+        return ZYN_EARLY_OUT_NONE; // Index aberrant, on décline le shunt
+    }
+
+    // Détermination de l'étage macro Y (0 à 5) à partir du Micro-Chunk mc_y (0 à 19 ? ou selon ton découpage)
+    // Comme ton Macro-Chunk est découpé en 20 couches de Micro-Chunks :
+    // Si mc_y va de 0 à 19, l'étage Y est donné par la correspondance globale de la colonne.
+    // NOTE : Si ton paquet réseau donne directement la coordonnée relative de la tranche,
+    // on va lire l'étage de l'entité globale correspondante.
+    // Supposons ici que la requête vise un étage Y macro spécifique ou qu'on le déduit :
+    uint32_t y_macro_idx = (uint32_t) (mc_y / 20); // À ajuster selon l'échelle exacte de ton mc_y mondial !
+    uint32_t m_y_local   = mc_y % 20; 
+    printf("[CHRONOS ] %u-%u,%u\n",mc_y,y_macro_idx,m_y_local);
+    
+    // 🛑 GARDE-FOU 3 : Sécurité sur l'axe vertical (6 étages max : 0 à 5)
+    if (y_macro_idx >= 6 || m_y_local >= 20) {
+        return ZYN_EARLY_OUT_NONE;
+    }
+     // --- CRAN 1 : EARLY OUT COUCHE 1 ---
+    uint32_t l2_index = g_hecate_regions[region_idx].colonnes[colonne_idx].etages[y_macro_idx].level2_index;
+// 🚀 UN VRAI EARLY OUT DE NIVEAU ARCHITECTURAL
+    if (l2_index == HECATE_STATE_AIR)   return ZYN_EARLY_OUT_AIR;
+    if (l2_index == HECATE_STATE_EAU)   return ZYN_EARLY_OUT_AIR; // Géré en air/vide ou token Eau selon ton choix
+    if (l2_index == HECATE_STATE_ROCHE) return ZYN_EARLY_OUT_ROCHE;
+    
+    // Si la valeur est HECATE_STATE_MIXTE, c'est qu'Hécate n'a pas encore traité ce bloc complexe
+    if (l2_index == HECATE_STATE_MIXTE) return ZYN_EARLY_OUT_NONE;
+
+    // 🧭 ACCÈS SÉCURISÉ À LA COUCHE 2
+    // Si ce n'est pas un état de Shunt (valeurs FFFFFFxx), c'est obligatoirement un index de pool légitime (0, 1, 2, ...).
+    // On peut lire la matière de la tranche d'un seul octet sans risque de corruption !
+    uint8_t type_l2 = g_hecate_layer2_pool[l2_index + m_y_local].matiere;
+
+    if (type_l2 == HECATE_MAT_AIR)   return ZYN_EARLY_OUT_AIR;
+    if (type_l2 == HECATE_MAT_ROCHE) return ZYN_EARLY_OUT_ROCHE;
+
+    return ZYN_EARLY_OUT_NONE;
+}
 
 // Connexion d'autorité unique gérée par Chronos
 static sqlite3 *g_db_main = NULL;
@@ -78,55 +193,71 @@ void chronos_fetch_and_populate_context(sqlite3_stmt *stmt, SharedMemoryPoolHead
     sqlite3_reset(stmt);
 }
 
+
 void* chronos_reader_thread(void *arg) {
     ChronosSessionArgs *args = (ChronosSessionArgs *)arg;
     uint8_t buffer[RECV_BUFFER_SIZE];
 
-    printf("[📥 CHRONOS-READER] Turbine d'entrée activée (Tunnel persistant).\n");
+    printf("[📥 CHRONOS-READER] Turbine d'entrée activée (Tunnel persistant avec Early-Out).\n");
 
-    // BOUCLE INTERNE : Flux continu sur la même socket (Connexion permanente)
     while (!g_shutdown_requested) {
-        // Lecture stricte des 8 octets attendus
         ssize_t bytes_read = read(args->socket_fd, buffer, RECV_BUFFER_SIZE);
 
         if (bytes_read == RECV_BUFFER_SIZE) {
-            // A. Traitement direct (Zéro-Copy)
             ChunkRequestPacket *packet = (ChunkRequestPacket *)buffer;
             int64_t macro_chunk_id = ntohl(packet->macro_chunk_id);
 
-            printf("[✅ READER] REQUÊTE : id %ld | Micro[%u, %u, %u] | LOD %u\n", 
-                   (long)macro_chunk_id, packet->mc_x, packet->mc_y, packet->mc_z, packet->lod);
+            // 🎯 STEP EXTRACTION : ÉVALUATION INTUITIVE DE L'EARLY OUT
+            int early_out_status = zyn_chronos_early_out_eval(macro_chunk_id, packet->mc_x, packet->mc_y, packet->mc_z);
 
-            // B. Pioche d'un contexte libre dans la SHM de Cerbère (Bloquant si vide)
-            int32_t idx = chronos_pop_shm_context(args->pool);
-
-            // C. Mappage ou récupération du pointeur physique de 16 Mo via le cache local
-            uint8_t *voxels_page = chronos_get_and_map_page(args->pool, idx);
-            if (!voxels_page) {
-                continue; // Sécurité mmap
+            if (early_out_status != ZYN_EARLY_OUT_NONE) {
+                // 🚀 HIGH-SPEED SHUNT TRICK !
+                // On prend un index mémoire pour empaqueter la réponse uniforme
+                int32_t idx = chronos_pop_shm_context(args->pool);
+                uint8_t *voxels_page = chronos_get_and_map_page(args->pool, idx);
+                
+                if (voxels_page) {
+                    // Au lieu d'allouer 16 Mo et d'attendre Atropos, on remplit la page avec le matériau uniforme
+                    // et on simule une compression magique de quelques octets pour le réseau !
+                    uint8_t mat = (early_out_status == ZYN_EARLY_OUT_AIR) ? HECATE_MAT_AIR : HECATE_MAT_ROCHE;
+                    
+                    // On forge un en-tête uniforme ultra-léger dans la page
+                    voxels_page[0] = mat; 
+                    
+                    args->pool->nodes[idx].context.macro_id = macro_chunk_id;
+                    args->pool->nodes[idx].context.compressed_size = 1; // Un seul octet suffit à décrire l'uniformité !
+                    
+                    // On court-circuite Atropos : on pousse directement l'état au Writer !
+                    __atomic_store_n(&args->pool->nodes[idx].context.status, ZYN_STATUS_COMPRESSED, __ATOMIC_RELEASE);
+                    
+                    // Notification directe au tunnel MQ du Writer local pour expédition
+                    mq_send(args->recv_mq, (const char*)&idx, sizeof(idx), 0);
+                }
+                continue; // On passe au paquet suivant, Atropos n'a rien vu passer !
             }
 
-            // Remplissage des données géométriques de la requête
+            // 🧭 CAS NOMINAL COMPLET (Si MIXTE)
+            int32_t idx = chronos_pop_shm_context(args->pool);
+            uint8_t *voxels_page = chronos_get_and_map_page(args->pool, idx);
+            if (!voxels_page) {
+                continue; 
+            }
+            __builtin_memset(voxels_page, 0, PAGE_SIZE_16MO);
+
             args->pool->nodes[idx].context.lod  = packet->lod;
             args->pool->nodes[idx].context.mc_x = packet->mc_x;
             args->pool->nodes[idx].context.mc_y = packet->mc_y;
             args->pool->nodes[idx].context.mc_z = packet->mc_z;
 
-            // D. Extraction Éclair depuis SQLite3 via la fonction dédiée
             chronos_fetch_and_populate_context(args->stmt, args->pool, idx, macro_chunk_id);
 
-            // E. Historisation des deltas (Emplacement préservé)
-            // voxels_page[index] = ... 
-
-            // F. Préparation des métadonnées du contexte
             args->pool->nodes[idx].context.macro_id = macro_chunk_id;
             args->pool->nodes[idx].context.context_id = idx;
             args->pool->nodes[idx].context.jobs_remaining = 4096;
             
-            // Passage du flambeau atomique
             __atomic_store_n(&args->pool->nodes[idx].context.status, ZYN_STATUS_COMPUTING, __ATOMIC_RELEASE);
 
-            // G. Notification à Atropos via la fonction dédiée
+            // Appel classique d'Atropos uniquement pour la vraie complexité géométrique !
             chronos_notify_atropos(args->atropos_mq, idx);
 
         } else if (bytes_read == 0) {
@@ -152,6 +283,8 @@ void* chronos_reader_thread(void *arg) {
 
     return NULL;
 }
+
+
 // Fonction isolée gérant la cinématique de notification résiliente vers Atropos
 void chronos_notify_atropos(mqd_t atropos_mq, int32_t idx) {
     AtroposMessage msg;
@@ -167,48 +300,81 @@ void chronos_notify_atropos(mqd_t atropos_mq, int32_t idx) {
         if (retries >= 5) {
             fprintf(stderr, "[❌ CRITIQUE] Reader n'a pas pu notifier Atropos pour la page %d après 5 essais !\n", idx);
         }
-    } else {
+    }
+#if ZYN_LOG_DEBUG
+    else {
         printf("[📥 READER] Page %d chargée en RAM. Signal envoyé à Atropos.\n", idx);
     }
+#endif    
 }
 
 
 
 // Fonction spécialisée dans l'expédition Non-Bloquante avec gestion de la Backpressure TCP
 int chronos_send_payload_nonblocking(int socket_fd, const uint8_t *voxels_page, uint32_t size, uint64_t macro_id) {
-    ssize_t total_sent = 0;
     int retries = 0;
 
+    // ==========================================
+    // 🎯 ÉTAPE 1 : ENVOI DE LA TAILLE (HEADER)
+    // ==========================================
+    // On doit envoyer les 4 octets de la taille brute ou compressée.
+    // Facultatif mais recommandé en réseau : convertir en Network Byte Order (htonl) 
+    // si le client est sur une architecture différente. Ici on reste en brut si même machine.
+    uint32_t header_size = size; 
+    uint32_t header_sent = 0;
+
+    while (header_sent < sizeof(uint32_t) && !g_shutdown_requested) {
+        ssize_t sent = send(socket_fd, ((uint8_t*)&header_size) + header_sent, sizeof(uint32_t) - header_sent, MSG_DONTWAIT);
+        if (sent > 0) {
+            header_sent += sent;
+            retries = 0;
+        } else if (sent < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                retries++;
+                if (retries > 1000) return -1;
+                usleep(10);
+            } else {
+                perror("[❌ WRITER] Erreur envoi header");
+                return -1;
+            }
+        } else {
+            return -1;
+        }
+    }
+
+    // ==========================================
+    // 🎯 ÉTAPE 2 : ENVOI DU PAYLOAD (VOXELS)
+    // ==========================================
+    ssize_t total_sent = 0;
+    retries = 0;
+
     while (total_sent < size && !g_shutdown_requested) {
-        // MSG_DONTWAIT force Linux à renvoyer EAGAIN au lieu de figer le thread
         ssize_t sent_bytes = send(socket_fd, voxels_page + total_sent, size - total_sent, MSG_DONTWAIT);
 
         if (sent_bytes > 0) {
             total_sent += sent_bytes;
-            retries = 0; // On a progressé, on réinitialise les essais
+            retries = 0; 
         } else if (sent_bytes < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                // Le buffer TCP est saturé ! brique3_sim est trop lente.
                 retries++;
                 if (retries > 1000) { 
-                    // Si après 1000 micro-pauses ça bloque toujours, la socket est asphyxiée
                     fprintf(stderr, "[⚠️ WRITER] Socket saturée (Backpressure TCP extrême) pour Macro_ID %lu\n", macro_id);
-                    break; // On laisse expirer pour éviter le deadlock total
+                    break; 
                 }
-                usleep(10); // Micro-respiration de 10 microsecondes pour laisser le noyau Linux souffler
+                usleep(10); 
             } else {
-                perror("[❌ WRITER] Erreur fatale send");
-                return -1; // Erreur socket fatale
+                perror("[❌ WRITER] Erreur fatale send payload");
+                return -1; 
             }
         } else {
-            return -1; // Socket close proprement à l'autre bout
+            return -1; 
         }
     }
 
     if (total_sent >= size) {
-        return 0; // Succès de l'envoi total
+        return 0; // Succès de l'envoi complet (Header + Payload)
     }
-    return 0; // Sortie par abandon de timeout (non-fatal pour le thread)
+    return 0; 
 }
 
 void* chronos_writer_thread(void *arg) {
@@ -243,12 +409,12 @@ void* chronos_writer_thread(void *arg) {
 
             // 🚀 Appel de la couche d'envoi non-bloquante extraite à l'éponge
             int res = chronos_send_payload_nonblocking(args->socket_fd, voxels_page, size, macro_id);
-
+#if ZYN_LOG_DEBUG
             if (res == 0 && !g_shutdown_requested) {
                 printf("[♻️ WRITER] BLOB envoyé avec succès pour Macro_ID %lu (%d octets) | Page SHM %d.\n", 
                        macro_id, size, node_idx_received);
             }
-
+#endif
             // 🔓 LIBÉRATION DU SLOT MEMOIRE (Quoi qu'il arrive, pour éviter les fuites de pages)
             __atomic_store_n(&args->pool->nodes[node_idx_received].context.status, ZYN_STATUS_FREE, __ATOMIC_RELEASE);
             chronos_push_shm_context(args->pool, node_idx_received);

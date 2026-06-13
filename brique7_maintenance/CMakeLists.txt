@@ -16,6 +16,7 @@ target_link_libraries(zyn_db_cli
     PRIVATE 
         zynthar_shared
         ${SQLite3_LIBRARIES}
+        m
 )
 
 # 5. Définition du dossier de sortie pour que le binaire soit généré proprement

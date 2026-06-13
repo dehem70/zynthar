@@ -22,4 +22,6 @@ mqd_t atlas_open_chronos_queue(void);
 int atlas_setup_epoll(int event_fd);
 void atlas_compress_and_signal_page(SharedMemoryPoolHeader *pool, int32_t idx, mqd_t chronos_mq);
 
+uint32_t atlas_compress_rle(const uint8_t *src, uint32_t src_size, uint8_t *dest, uint32_t max_dest_size);
+
 #endif // ZYN_ATLAS_UTILS_H

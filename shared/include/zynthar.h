@@ -6,7 +6,7 @@
 
 
 
-#define ZYN_LOG_DEBUG  0
+#define ZYN_LOG_DEBUG  1
 
 // ============================================================================
 // [SECTION 0] MACROS UTILITAIRES & LIENS EXTERNES
@@ -59,6 +59,7 @@ int stbi_write_png(char const *filename, int w, int h, int comp, void const *dat
 // --- Dimensions de la Grille Terrestre ---
 #define ZYN_WORLD_REGION_X      8     // Configuration de la carte : 8 régions en X
 #define ZYN_WORLD_REGION_Z      4     // Configuration de la carte : 4 régions en Z
+#define ZYN_TOTAL_REGIONS       (ZYN_WORLD_REGION_X *ZYN_WORLD_REGION_Z)
 #define ZYN_WORLD_MACRO_DIM     256   // Résolution : 256 MacroChunks par côté de région
 
 // Largeurs et profondeurs globales exprimées en nombre de MacroChunks
@@ -72,6 +73,7 @@ int stbi_write_png(char const *filename, int w, int h, int comp, void const *dat
 #define ZYN_WORLD_Y_MIN         -1024 // Abysse max (Exactement 40 Micro-Chunks de 25.6m sous Y=0)
 #define ZYN_WORLD_Y_MAX         2048  // Zénith max (Exactement 80 Micro-Chunks de 25.6m au-dessus de Y=0)
 #define ZYN_SEA_LEVEL           0     // Point d'ancrage hydrographique (Coïncide avec une frontière de chunk)
+#define ZYN_WORLD_MACRO_HEIGHT_Y ((ZYN_WORLD_Y_MAX-ZYN_WORLD_Y_MIN)/ZYN_MACRO_CHUNK_DIM_M)
 
 // --- Métriques des structures de Voxels (Puissances de 2) ---
 #define ZYN_VOXEL_TO_M          0.1f  // Résolution spatiale élémentaire : 1 voxel = 10 cm
@@ -79,6 +81,19 @@ int stbi_write_png(char const *filename, int w, int h, int comp, void const *dat
 #define ZYN_MICRO_CHUNK_SHIFT   8     // Décalage de bits associé (2^8 = 256) pour divisions/multiplications CPU
 #define ZYN_MACRO_CHUNK_DIM_M   512   // Longueur d'un Macro-Chunk : 512 mètres (Exactement 20 Micro-Chunks)
 #define ZYN_NANO_CHUNK_DIM_VOX  16    // Unité de travail du cache CPU : 16^3 voxels (Page de 4 Ko)
+
+#define HECATE_MAT_AIR      0
+#define HECATE_MAT_ROCHE    1
+#define HECATE_MAT_EAU      2
+#define HECATE_MAT_SABLE    3  
+#define HECATE_MAT_TERRE    4  
+#define HECATE_MAT_MIXTE    255        // Le matériau d'un Micro-Chunk hétérogène (8 bits)
+
+// Dans ton fichier d'en-tête commun (ex: zyn_hecate_utils.h ou zynthar.h)
+#define HECATE_STATE_AIR    0xFFFFFFF0
+#define HECATE_STATE_ROCHE  0xFFFFFFF1
+#define HECATE_STATE_EAU    0xFFFFFFF2
+#define HECATE_STATE_MIXTE  0xFFFFFFFF // Ton 255 d'origine entre en collision avec l'index de pool 255 !
 
 // Limites physiques absolues du monde exprimées en mètres
 #define ZYN_WORLD_X_MAX         (ZYN_WORLD_MACRO_WIDTH_X * ZYN_MACRO_CHUNK_DIM_M) // ~1 000 km

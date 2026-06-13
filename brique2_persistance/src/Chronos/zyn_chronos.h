@@ -10,7 +10,7 @@
  #include <mqueue.h>
 #include <sqlite3.h>
 #include <netinet/in.h>
-#include "zyn_b2_memory_pool.h" // 🎯 AJOUT pour que Chronos connaisse la structure SHM
+#include "zyn_b2_memory_pool.h"
 
 
 

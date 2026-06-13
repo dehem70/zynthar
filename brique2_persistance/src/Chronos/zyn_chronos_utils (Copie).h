@@ -59,9 +59,7 @@ SharedMemoryPoolHeader* chronos_attach_shm(const char *shm_name);
 // C. Création et configuration de la Socket Serveur TCP
 int chronos_create_server_socket(struct sockaddr_in *address, int *addrlen);
 
-void chronos_run(SharedMemoryPoolHeader *pool, int server_fd, struct sockaddr_in address, int addrlen, mqd_t atropos_mq);
-
-int zyn_chronos_early_out_eval(uint32_t macro_chunk_id, uint8_t mc_x, uint8_t mc_y, uint8_t mc_z);
+void chronos_run(SharedMemoryPoolHeader *pool, int server_fd, struct sockaddr_in address, int addrlen, mqd_t atropos_mq); 
 
 void zyn_chronos_attach_hecate_shm(void);
 

@@ -10,7 +10,7 @@
  #include <pthread.h>
 #include <stdint.h>
 #define PAGE_SIZE_16MO 16777216
-#define MAX_POOL_PAGES 16 // Limite théorique haute, mais n'occupe aucune RAM au départ
+#define MAX_POOL_PAGES 64 // Limite théorique haute, mais n'occupe aucune RAM au départ
 
 typedef struct {
     uint8_t context_id;          

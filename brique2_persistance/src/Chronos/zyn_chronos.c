@@ -43,6 +43,7 @@ int main(int argc, char *argv[]) {
     // Configuration des buffers de sortie pour éviter la mise en tampon des logs
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
+    signal(SIGPIPE, SIG_IGN);
 
     // 1. Gestion des signaux système (SIGINT / SIGTERM)
     struct sigaction sa;
@@ -51,10 +52,12 @@ int main(int argc, char *argv[]) {
     sa.sa_flags = 0;
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
-
+    
     // 2. Initialisation technique et parsing des arguments
     char *shm_name = NULL;
     chronos_parse_args(argc, argv, &shm_name);
+    
+    zyn_chronos_attach_hecate_shm();
 
     // 3. Attachement à l'infrastructure partagée
     SharedMemoryPoolHeader *global_pool = chronos_attach_shm(shm_name);

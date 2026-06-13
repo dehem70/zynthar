@@ -60,34 +60,51 @@ void* response_reader_thread(void *arg) {
     int sock = *(int*)arg;
     uint8_t recv_buffer[BUFFER_SIZE];
 
-    printf("[📥 SIM-READER] Écouteur de réponses actif sur la socket.\n");
+    printf("[📥 SIM-READER] Écouteur de réponses actif.\n");
 
-uint32_t bytes_expected = 512 * 1024; // 512 Ko attendus par page d'Atlas
-    uint32_t current_packet_bytes = 0;
+    while (1) {
+        uint32_t bytes_expected = 0;
 
-    while (g_running) {
-        ssize_t bytes_read = read(sock, recv_buffer, BUFFER_SIZE);
-
-        if (bytes_read > 0) {
-            current_packet_bytes += bytes_read;
-            
-            // Si on a accumulé assez d'octets pour reconstituer une page entière
-            if (current_packet_bytes >= bytes_expected) {
-                __atomic_fetch_add(&g_total_received, 1, __ATOMIC_RELAXED);
-                current_packet_bytes -= bytes_expected; // On garde le reliquat s'il y a chevauchement
-            }
-        } else if (bytes_read == 0) {
-            printf("[📥 SIM-READER] Connexion close par Chronos.\n");
-            break;
-        } else {
-            if (errno == EINTR) continue;
-            perror("[❌ SIM-READER] Erreur de lecture");
+        // 1. Lire d'abord les 4 octets de taille envoyés par le serveur
+        ssize_t h_read = read(sock, &bytes_expected, sizeof(bytes_expected));
+        if (h_read <= 0) {
+            printf("[📥 SIM-READER] Fin de flux ou déconnexion.\n");
             break;
         }
+
+        if (bytes_expected==1) {
+            printf("[📥 SIM-READER] Lecture d'une page annoncée à %u octets...\n", bytes_expected);
+        }    
+
+        uint32_t current_packet_bytes = 0;
+
+        // 2. Boucle dynamique de lecture du payload exact
+        while (current_packet_bytes < bytes_expected) {
+            uint32_t to_read = bytes_expected - current_packet_bytes;
+            if (to_read > BUFFER_SIZE) to_read = BUFFER_SIZE;
+
+            ssize_t bytes_read = read(sock, recv_buffer, to_read);
+            if (bytes_read > 0) {
+                current_packet_bytes += bytes_read;
+            } else if (bytes_read == 0) {
+                printf("[❌ SIM-READER] Connexion coupée pendant la lecture.\n");
+                return NULL;
+            } else {
+                if (errno == EINTR) continue;
+                perror("[❌ SIM-READER] Erreur lecture data");
+                return NULL;
+            }
+        }
+
+        // 3. Traitement de la page reçue
+        // Si bytes_expected == 16777216 -> C'est du Brut !
+        // Si bytes_expected < 16777216 -> C'est du RLE ! Décompression nécessaire !
+        //printf("[✅ SIM-READER] Page complète reçue (%u octets).\n", current_packet_bytes);
+        g_total_received++;
     }
+
     return NULL;
 }
-
 // =============================================================================
 // 🏁 PROGRAMME PRINCIPAL (Bombardier)
 // =============================================================================
