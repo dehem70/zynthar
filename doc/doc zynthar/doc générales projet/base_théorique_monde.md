@@ -7,7 +7,7 @@ Ce modèle théorique permet de résoudre les trois grands défis historiques de
 
 La base de données reste minuscule car elle ne contient aucun cube brut. Elle se divise en trois structures distinctes :
 
-- **MacroChunks (Grille de 512m / ~2M de lignes) :** Stocke uniquement le squelette du monde, à savoir le type de biome, la température, l'humidité et l'élévation maximale théorique.
+- **MacroChunks (Grille de 64m / ~134M de lignes) :** Stocke uniquement le squelette du monde, à savoir le type de biome, la température, l'humidité et l'élévation maximale théorique.
     
 - **Rivers (Vectoriel / Table séparée) :** Stocke les lignes brisées des cours d'eau avec leur débit. Ces données servent simultanément pour le creusement déterministe du relief, la physique des bateaux et la génération d'énergie.
     

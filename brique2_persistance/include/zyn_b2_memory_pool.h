@@ -11,7 +11,10 @@
 #include <stdint.h>
 #define PAGE_SIZE_16MO 16777216
 #define MAX_POOL_PAGES 64 // Limite théorique haute, mais n'occupe aucune RAM au départ
+#define ZYN_CHRONOS_PORT                6969
+#define ZYN_CHRONOS_ADDRESS             "127.0.0.1"
 
+#define NB_FORGERONS 8
 typedef struct {
     uint8_t context_id;          
     uint8_t lod;                 

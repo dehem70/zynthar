@@ -7,6 +7,14 @@
 #include <zynthar.h>
 #include "zyn_river_agent.h"
 
+
+/**
+ * @brief Binding natif vers la bibliothèque d'export STB Image.
+ * Utilisé offline (B5) ou pour la maintenance (B7) afin de cartographier le monde.
+ */
+int stbi_write_png(char const *filename, int w, int h, int comp, void const *data, int stride_in_bytes);
+
+
 /**
  * @brief Exporte la carte d'élévation macro en une image PNG en niveaux de gris et son masque binaire.
  * L'altitude -100m (ou moins) sera noire (0), l'altitude +100m (ou plus) sera blanche (255).

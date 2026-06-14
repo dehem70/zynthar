@@ -83,12 +83,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "doc source/Hécate.md",
+                "file": "doc générales projet/echelle_monde.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Hécate"
+              "title": "echelle_monde"
             }
           }
         ],
@@ -165,7 +165,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "doc source/Hécate.md",
+                "file": "doc générales projet/echelle_monde.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -175,7 +175,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Rétrolien pour Hécate"
+              "title": "Rétrolien pour echelle_monde"
             }
           },
           {
@@ -253,8 +253,9 @@
       "bases:Créer une nouvelle base": false
     }
   },
-  "active": "b1ef77b5d1f30a02",
+  "active": "40947e3d4a9c2436",
   "lastOpenFiles": [
+    "doc générales projet/base_théorique_monde.md",
     "doc source/Hécate.md",
     "doc source/Architecture brique2.md",
     "doc source/brique 2 - gestion mémoire + pipeline asynchrone.md",
@@ -266,7 +267,6 @@
     "doc générales projet/Roadmap V0.1.md",
     "doc générales projet/Zynthar_Masterplan.pdf",
     "doc générales projet/base_theorique_communication.md",
-    "doc générales projet/base_théorique_monde.md",
     "doc générales projet/base_théorique_joueur.md",
     "Sans titre.md",
     "doc générales projet/Zynthar_Voxel_Masterplan.pdf",
