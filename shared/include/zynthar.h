@@ -66,13 +66,15 @@
 
 /* LOD 1 : Micro-Chunk (Unité de calcul RAW interne) */
 #define ZYN_MICRO_CHUNK_DIM_M     4         /* 4 mètres de côté */
-#define ZYN_MESO_TO_MICRO_RATIO   4         /* Un Meso-Chunk contient 4x4x4 Micro-Chunks */
 
+#define ZYN_MESO_TO_MICRO_RATIO   ( ZYN_MESO_CHUNK_DIM_M /  ZYN_MICRO_CHUNK_DIM_M)
 
 /* -----------------------------------------------------------------------------
  * 5. DIMENSIONS EN VOXELS ET VOLUMÉTRIE MÉMOIRE (LOD 1 INTERNE)
  * -------------------------------------------------------------------------- */
 #define ZYN_MICRO_CHUNK_VOXEL_DIM     (ZYN_MICRO_CHUNK_DIM_M * ZYN_VOXELS_PER_METER)
+
+#define ZYN_MESO_CHUNK_TOTAL_MICRO   (ZYN_MESO_TO_MICRO_RATIO *ZYN_MESO_TO_MICRO_RATIO *ZYN_MESO_TO_MICRO_RATIO ) 
 
 /* Nombre total de voxels dans un Micro-Chunk de travail (40^3 = 64 000 voxels) */
 #define ZYN_MICRO_CHUNK_TOTAL_VOXELS (ZYN_MICRO_CHUNK_VOXEL_DIM * ZYN_MICRO_CHUNK_VOXEL_DIM * ZYN_MICRO_CHUNK_VOXEL_DIM)
